@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="TLB Performance Analyzer — Simulate TLB behavior, compare replacement policies, and analyze memory access performance with EMAT calculations.">
+    <meta name="description" content="TLB Performance Analyzer — Simulate TLB behavior step-by-step, compare replacement policies, analyze EMAT, and visualize performance with interactive charts.">
     <title>TLB Performance Analyzer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,6 +23,7 @@
             --accent-light: #a29bfe;
             --hit: #00cec9;
             --miss: #fd79a8;
+            --warn: #fdcb6e;
             --radius: 10px;
         }
 
@@ -37,12 +38,11 @@
         }
 
         .container {
-            max-width: 960px;
+            max-width: 1020px;
             margin: 0 auto;
             padding: 48px 24px 72px;
         }
 
-        /* ── Header ── */
         .header { text-align: center; margin-bottom: 40px; }
 
         h1 {
@@ -58,7 +58,6 @@
             color: var(--text-muted);
         }
 
-        /* ── Panels ── */
         .panel {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -78,7 +77,6 @@
             border-bottom: 1px solid var(--border);
         }
 
-        /* ── Input Grid ── */
         .input-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -153,8 +151,7 @@
 
         .hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 5px; }
 
-        /* ── Buttons ── */
-        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 
         button {
             padding: 10px 22px;
@@ -164,19 +161,20 @@
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
-            transition: opacity 0.15s;
+            transition: all 0.18s ease;
         }
 
         button:hover { opacity: 0.88; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .btn-primary { background: var(--accent); color: #fff; }
         .btn-secondary { background: #1e1e28; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-hit { background: rgba(0,206,201,0.15); color: var(--hit); border: 1px solid rgba(0,206,201,0.25); }
+        .btn-miss { background: rgba(253,121,168,0.15); color: var(--miss); border: 1px solid rgba(253,121,168,0.25); }
 
-        /* ── Output Sections ── */
         .output { display: none; }
         .output.visible { display: block; }
 
-        /* ── Tables ── */
         .tbl-wrap { overflow-x: auto; }
 
         table {
@@ -220,10 +218,10 @@
         .val-hit { color: var(--hit); }
         .val-miss { color: var(--miss); }
         .val-accent { color: var(--accent-light); }
+        .val-warn { color: var(--warn); }
 
         .best-row td { color: var(--text); font-weight: 600; }
 
-        /* ── Metric Cards ── */
         .metric-row {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -255,10 +253,8 @@
             margin-top: 4px;
         }
 
-        /* ── Baseline Table ── */
         .baseline-tbl td:first-child { font-weight: 500; color: var(--text); }
 
-        /* ── Analysis ── */
         .analysis-list {
             list-style: none;
             padding: 0;
@@ -292,7 +288,6 @@
             color: var(--accent-light);
         }
 
-        /* ── Chart ── */
         .chart-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -311,7 +306,6 @@
             height: 260px !important;
         }
 
-        /* ── Trace toggle ── */
         .trace-toggle {
             display: flex;
             align-items: center;
@@ -329,7 +323,6 @@
         .trace-body::-webkit-scrollbar { width: 5px; }
         .trace-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 
-        /* ── Observations ── */
         .obs-box {
             background: rgba(108, 92, 231, 0.04);
             border: 1px solid rgba(108,92,231,0.12);
@@ -345,14 +338,312 @@
         }
 
         .obs-box p:last-child { margin-bottom: 0; }
-
         .obs-box strong { color: var(--text); }
 
-        /* ── Responsive ── */
+        .warn-box {
+            background: rgba(253,203,110,0.06);
+            border: 1px solid rgba(253,203,110,0.18);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.8rem;
+            color: var(--warn);
+            display: none;
+        }
+
+        .warn-box.visible { display: block; }
+
+        .warn-icon { margin-right: 6px; }
+
+        .sim-step-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin-bottom: 14px;
+            transition: border-color 0.3s ease, background 0.3s ease;
+        }
+
+        .sim-step-card.step-hit {
+            border-color: rgba(0,206,201,0.3);
+            background: rgba(0,206,201,0.03);
+        }
+
+        .sim-step-card.step-miss {
+            border-color: rgba(253,121,168,0.3);
+            background: rgba(253,121,168,0.03);
+        }
+
+        .sim-step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .sim-step-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .sim-step-detail {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+        }
+
+        .sim-detail-item {
+            text-align: center;
+        }
+
+        .sim-detail-label {
+            font-size: 0.64rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+
+        .sim-detail-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+
+        .sim-tlb-state {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .sim-tlb-col-label {
+            font-size: 0.64rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .sim-tlb-entries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .sim-tlb-entry {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            background: rgba(108,92,231,0.1);
+            color: var(--accent-light);
+        }
+
+        .sim-tlb-entry.new-entry {
+            background: rgba(0,206,201,0.15);
+            color: var(--hit);
+        }
+
+        .sim-tlb-empty {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .sim-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 2px;
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+        .sim-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--hit));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        .sim-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .sim-counter {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        .sim-stats-row {
+            display: flex;
+            gap: 16px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .sim-stat {
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .formula-box {
+            background: rgba(108,92,231,0.04);
+            border: 1px solid rgba(108,92,231,0.12);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+
+        .formula-main {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-light);
+            text-align: center;
+            padding: 14px 0;
+            letter-spacing: 0.01em;
+        }
+
+        .formula-steps {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(108,92,231,0.1);
+        }
+
+        .formula-step {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            padding: 4px 0;
+        }
+
+        .formula-step .eq-result {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .preset-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .preset-row label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .preset-row select {
+            padding: 8px 30px 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2350505e' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            transition: border-color 0.15s;
+        }
+
+        .preset-row select:focus { border-color: var(--border-focus); }
+        .preset-row select option { background: var(--bg-card); color: var(--text); }
+
+        .comparison-toggle {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .comparison-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .comparison-toggle input {
+            accent-color: var(--accent);
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .comp-result-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .comp-card {
+            text-align: center;
+            padding: 20px 14px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .comp-card-title {
+            font-size: 0.66rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .comp-card-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .comp-card-sub {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .sim-step-container {
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .sim-step-container::-webkit-scrollbar { width: 5px; }
+        .sim-step-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
         @media (max-width: 700px) {
             .input-grid { grid-template-columns: repeat(2, 1fr); }
             .chart-container { grid-template-columns: 1fr; }
             .metric-row { grid-template-columns: repeat(3, 1fr); }
+            .comp-result-grid { grid-template-columns: 1fr; }
+            .sim-step-detail { grid-template-columns: repeat(3, 1fr); }
+            .sim-tlb-state { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 480px) {
@@ -369,8 +660,19 @@
         </div>
 
         <!-- ─── INPUT CONFIGURATION ─── -->
-        <div class="panel">
+        <div class="panel" id="panelInput">
             <div class="panel-title">Input Configuration</div>
+
+            <div class="preset-row">
+                <label for="presetWorkload">Preset Workload</label>
+                <select id="presetWorkload" onchange="applyPreset()">
+                    <option value="">— Custom —</option>
+                    <option value="sequential">Sequential Access</option>
+                    <option value="random">Random Access</option>
+                    <option value="locality">Locality-Based</option>
+                </select>
+            </div>
+
             <div class="input-grid">
                 <div class="field">
                     <label for="numPages">Pages</label>
@@ -382,7 +684,7 @@
                 </div>
                 <div class="field">
                     <label for="tlbSize">TLB Size</label>
-                    <input type="number" id="tlbSize" value="4" min="1">
+                    <input type="number" id="tlbSize" value="4" min="0">
                 </div>
                 <div class="field">
                     <label for="numAccesses">Accesses</label>
@@ -411,6 +713,9 @@
         <!-- ─── OUTPUT ─── -->
         <div class="output" id="output">
 
+            <!-- Warnings -->
+            <div class="warn-box" id="warnBox"></div>
+
             <!-- 1. Input Summary -->
             <div class="panel" id="panelSummary">
                 <div class="panel-title">Input Summary</div>
@@ -418,13 +723,47 @@
                 <p id="addressList" style="font-size:0.78rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; word-break:break-all;"></p>
             </div>
 
-            <!-- 2. Results Table (primary TLB size) -->
+            <!-- 2. Results -->
             <div class="panel" id="panelResults">
                 <div class="panel-title">Simulation Results</div>
                 <div class="metric-row" id="resultMetrics"></div>
             </div>
 
-            <!-- 3. Comparison Table (TLB sizes 2, 4, 8) -->
+            <!-- 3. EMAT Formula -->
+            <div class="panel" id="panelFormula">
+                <div class="panel-title">EMAT Formula Explanation</div>
+                <div class="formula-box" id="formulaBox"></div>
+            </div>
+
+            <!-- 4. Step-by-Step Simulation -->
+            <div class="panel" id="panelSimulation">
+                <div class="panel-title">Step-by-Step TLB Simulation</div>
+                <div class="sim-progress"><div class="sim-progress-bar" id="simProgressBar" style="width:0%"></div></div>
+                <div class="sim-controls">
+                    <button class="btn-primary" id="btnNextStep" onclick="simNextStep()">Next Step</button>
+                    <button class="btn-hit" id="btnAutoPlay" onclick="simAutoPlay()">Auto Play</button>
+                    <button class="btn-secondary" id="btnResetSim" onclick="simReset()">Reset</button>
+                    <span class="sim-counter" id="simCounter">0 / 0</span>
+                </div>
+                <div class="sim-stats-row" id="simStatsRow">
+                    <span class="sim-stat">Hits: <span class="val-hit" id="simHits">0</span></span>
+                    <span class="sim-stat">Misses: <span class="val-miss" id="simMisses">0</span></span>
+                    <span class="sim-stat">Rate: <span class="val-accent" id="simRate">0%</span></span>
+                </div>
+                <div class="sim-step-container" id="simStepContainer" style="margin-top:16px;"></div>
+            </div>
+
+            <!-- 5. Comparison Mode -->
+            <div class="panel" id="panelCompMode">
+                <div class="panel-title">TLB Comparison Mode</div>
+                <div class="comparison-toggle">
+                    <label><input type="checkbox" id="compWithTlb" checked onchange="updateComparison()"> With TLB</label>
+                    <label><input type="checkbox" id="compWithoutTlb" checked onchange="updateComparison()"> Without TLB</label>
+                </div>
+                <div class="comp-result-grid" id="compModeGrid"></div>
+            </div>
+
+            <!-- 6. Multi-Size Comparison -->
             <div class="panel" id="panelComparison">
                 <div class="panel-title">Multi-Size TLB Comparison</div>
                 <div class="tbl-wrap">
@@ -446,7 +785,7 @@
                 <div class="obs-box" id="comparisonObs"></div>
             </div>
 
-            <!-- 4. Baseline Comparison (Without TLB vs With TLB) -->
+            <!-- 7. Baseline Comparison -->
             <div class="panel" id="panelBaseline">
                 <div class="panel-title">Baseline Comparison — With vs Without TLB</div>
                 <div class="tbl-wrap">
@@ -459,7 +798,7 @@
                 </div>
             </div>
 
-            <!-- 5. Charts -->
+            <!-- 8. Charts -->
             <div class="panel" id="panelCharts">
                 <div class="panel-title">Performance Charts</div>
                 <div class="chart-container">
@@ -467,14 +806,14 @@
                         <canvas id="chartHitRate"></canvas>
                     </div>
                     <div class="chart-box">
-                        <canvas id="chartEmat"></canvas>
+                        <canvas id="chartAccessTime"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- 6. Step-by-Step Trace -->
+            <!-- 9. Step-by-Step Trace -->
             <div class="panel" id="panelTrace">
-                <div class="panel-title">Step-by-Step Trace</div>
+                <div class="panel-title">Full Access Trace</div>
                 <label class="trace-toggle">
                     <input type="checkbox" id="traceToggle" checked onchange="toggleTrace()">
                     Show detailed trace for each memory access
@@ -499,7 +838,7 @@
                 </div>
             </div>
 
-            <!-- 7. Analysis -->
+            <!-- 10. Analysis -->
             <div class="panel" id="panelAnalysis">
                 <div class="panel-title">Analysis &amp; Interpretation</div>
                 <ul class="analysis-list" id="analysisList"></ul>
@@ -508,9 +847,6 @@
     </div>
 
 <script>
-// ════════════════════════════════════════════
-//  CORE SIMULATION ENGINE (unchanged logic)
-// ════════════════════════════════════════════
 
 const TLB_ACCESS_TIME = 1;
 const MEMORY_ACCESS_TIME = 10;
@@ -571,7 +907,10 @@ class TLB {
     }
 }
 
-function simulate(config) {
+function simulateTLB(config) {
+    if (config.tlbSize === 0) {
+        return simulateNoTLB(config);
+    }
     const pt = new PageTable(config.numPages);
     const tlb = new TLB(config.tlbSize, config.policy);
     const results = [];
@@ -580,6 +919,7 @@ function simulate(config) {
     for (const addr of config.addresses) {
         const page = Math.floor(addr / config.pageSize);
         const offset = addr % config.pageSize;
+        const tlbBefore = tlb.snapshot();
         let frame = tlb.lookup(page);
         let hit;
 
@@ -593,26 +933,44 @@ function simulate(config) {
             if (frame !== -1) tlb.insert(page, frame);
         }
 
-        results.push({ addr, page, offset, frame, hit, tlb: tlb.snapshot() });
+        results.push({ addr, page, offset, frame, hit, tlbBefore, tlb: tlb.snapshot() });
     }
 
     const total = hits + misses;
-    const hitRate = total ? hits / total : 0;
+    const hitRate = calculateHitRate(hits, total);
     const missRate = total ? misses / total : 0;
-    const emat = (hitRate * TLB_ACCESS_TIME) + (missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME));
+    const emat = calculateEMAT(hitRate, missRate);
 
     return { results, hits, misses, total, hitRate, missRate, emat };
 }
 
-// ════════════════════════════════════════════
-//  CHART INSTANCES
-// ════════════════════════════════════════════
+function simulateNoTLB(config) {
+    const pt = new PageTable(config.numPages);
+    const results = [];
 
-let chartHR = null, chartEM = null;
+    for (const addr of config.addresses) {
+        const page = Math.floor(addr / config.pageSize);
+        const offset = addr % config.pageSize;
+        const frame = pt.lookup(page);
+        results.push({ addr, page, offset, frame, hit: false, tlbBefore: {}, tlb: {} });
+    }
 
-// ════════════════════════════════════════════
-//  MAIN ANALYSIS FUNCTION
-// ════════════════════════════════════════════
+    const total = config.addresses.length;
+    return { results, hits: 0, misses: total, total, hitRate: 0, missRate: 1, emat: MEMORY_ACCESS_TIME };
+}
+
+function calculateHitRate(hits, total) {
+    return total ? hits / total : 0;
+}
+
+function calculateEMAT(hitRate, missRate) {
+    return (hitRate * TLB_ACCESS_TIME) + (missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME));
+}
+
+let chartHR = null, chartAT = null;
+
+let simState = null;
+let autoPlayTimer = null;
 
 function getAddresses(numPages, pageSize, numAccesses) {
     const addrText = document.getElementById('addresses').value.trim();
@@ -623,29 +981,100 @@ function getAddresses(numPages, pageSize, numAccesses) {
     return Array.from({ length: numAccesses }, () => Math.floor(Math.random() * (maxAddr + 1)));
 }
 
+function applyPreset() {
+    const preset = document.getElementById('presetWorkload').value;
+    const numPages = parseInt(document.getElementById('numPages').value) || 10;
+    const pageSize = parseInt(document.getElementById('pageSize').value) || 10;
+    const numAccesses = parseInt(document.getElementById('numAccesses').value) || 20;
+
+    if (!preset) return;
+
+    let addresses = [];
+
+    if (preset === 'sequential') {
+        for (let i = 0; i < numAccesses; i++) {
+            addresses.push((i % numPages) * pageSize + Math.floor(Math.random() * pageSize));
+        }
+    } else if (preset === 'random') {
+        const maxAddr = numPages * pageSize - 1;
+        for (let i = 0; i < numAccesses; i++) {
+            addresses.push(Math.floor(Math.random() * (maxAddr + 1)));
+        }
+    } else if (preset === 'locality') {
+        const subsetSize = Math.min(3, numPages);
+        const subset = [];
+        for (let i = 0; i < subsetSize; i++) {
+            subset.push(i);
+        }
+        for (let i = 0; i < numAccesses; i++) {
+            const page = subset[i % subset.length];
+            addresses.push(page * pageSize + Math.floor(Math.random() * pageSize));
+        }
+    }
+
+    document.getElementById('addresses').value = addresses.join(', ');
+}
+
+function getWarnings(tlbSize, addresses, numPages, pageSize) {
+    const warnings = [];
+
+    if (tlbSize === 0) {
+        warnings.push('TLB size is 0 — simulation behaves as if no TLB is present (every access goes to memory).');
+    }
+
+    if (!addresses || addresses.length === 0) {
+        warnings.push('No addresses provided — please enter addresses or use a preset workload.');
+    }
+
+    const maxValidAddr = numPages * pageSize - 1;
+    const outOfRange = addresses.filter(a => a < 0 || a > maxValidAddr);
+    if (outOfRange.length > 0) {
+        warnings.push(`${outOfRange.length} address(es) are out of valid range [0–${maxValidAddr}]. They may map to undefined pages.`);
+    }
+
+    return warnings;
+}
+
 function runFullAnalysis() {
-    const numPages  = parseInt(document.getElementById('numPages').value);
-    const pageSize  = parseInt(document.getElementById('pageSize').value);
-    const tlbSize   = parseInt(document.getElementById('tlbSize').value);
-    const numAccesses = parseInt(document.getElementById('numAccesses').value);
-    const policy    = document.getElementById('policy').value;
+    const numPages = parseInt(document.getElementById('numPages').value) || 1;
+    const pageSize = parseInt(document.getElementById('pageSize').value) || 1;
+    const tlbSize = parseInt(document.getElementById('tlbSize').value);
+    const numAccesses = parseInt(document.getElementById('numAccesses').value) || 1;
+    const policy = document.getElementById('policy').value;
 
     const addresses = getAddresses(numPages, pageSize, numAccesses);
 
-    // ── 1. INPUT SUMMARY ──
+    if (addresses.length === 0) {
+        const warnEl = document.getElementById('warnBox');
+        warnEl.innerHTML = '<span class="warn-icon">⚠</span>No valid addresses to simulate. Please enter addresses or increase the access count.';
+        warnEl.classList.add('visible');
+        document.getElementById('output').classList.add('visible');
+        return;
+    }
+
+    const warnings = getWarnings(isNaN(tlbSize) ? 0 : tlbSize, addresses, numPages, pageSize);
+    const warnEl = document.getElementById('warnBox');
+    if (warnings.length > 0) {
+        warnEl.innerHTML = warnings.map(w => `<span class="warn-icon">⚠</span>${w}`).join('<br>');
+        warnEl.classList.add('visible');
+    } else {
+        warnEl.classList.remove('visible');
+    }
+
+    const effectiveTlbSize = isNaN(tlbSize) ? 0 : Math.max(0, tlbSize);
+
     document.getElementById('inputSummaryMetrics').innerHTML = `
         <div class="metric"><div class="metric-val">${numPages}</div><div class="metric-label">Pages</div></div>
         <div class="metric"><div class="metric-val">${pageSize}</div><div class="metric-label">Page Size</div></div>
-        <div class="metric"><div class="metric-val">${tlbSize}</div><div class="metric-label">TLB Size</div></div>
+        <div class="metric"><div class="metric-val">${effectiveTlbSize}</div><div class="metric-label">TLB Size</div></div>
         <div class="metric"><div class="metric-val">${addresses.length}</div><div class="metric-label">Accesses</div></div>
         <div class="metric"><div class="metric-val">${policy}</div><div class="metric-label">Policy</div></div>
         <div class="metric"><div class="metric-val">${TLB_ACCESS_TIME} / ${MEMORY_ACCESS_TIME}</div><div class="metric-label">TLB / Mem Time</div></div>
     `;
     document.getElementById('addressList').textContent = 'Addresses: [' + addresses.join(', ') + ']';
 
-    // ── 2. PRIMARY SIMULATION ──
-    const config = { numPages, pageSize, tlbSize, policy, addresses };
-    const sim = simulate(config);
+    const config = { numPages, pageSize, tlbSize: effectiveTlbSize, policy, addresses };
+    const sim = simulateTLB(config);
     const speedup = sim.emat > 0 ? (MEMORY_ACCESS_TIME / sim.emat) : 0;
 
     document.getElementById('resultMetrics').innerHTML = `
@@ -657,16 +1086,22 @@ function runFullAnalysis() {
         <div class="metric"><div class="metric-val val-accent">${speedup.toFixed(2)}×</div><div class="metric-label">Speedup</div></div>
     `;
 
-    // ── 3. MULTI-SIZE COMPARISON (TLB = 2, 4, 8) ──
+    renderFormulaExplanation(sim.hitRate, sim.missRate, sim.emat);
+
+    initSimulation(config, sim);
+
+    window._lastConfig = config;
+    window._lastSim = sim;
+    updateComparison();
+
     const compSizes = [2, 4, 8];
     const compResults = [];
 
     for (const sz of compSizes) {
-        const r = simulate({ numPages, pageSize, tlbSize: sz, policy, addresses });
+        const r = simulateTLB({ numPages, pageSize, tlbSize: sz, policy, addresses });
         compResults.push({ size: sz, ...r });
     }
 
-    // Find best EMAT
     let bestEmat = Infinity;
     compResults.forEach(r => { if (r.emat < bestEmat) bestEmat = r.emat; });
 
@@ -685,7 +1120,6 @@ function runFullAnalysis() {
         </tr>`;
     });
 
-    // Observations
     const obsBox = document.getElementById('comparisonObs');
     const best = compResults.reduce((a, b) => a.emat < b.emat ? a : b);
     const worst = compResults.reduce((a, b) => a.emat > b.emat ? a : b);
@@ -699,7 +1133,6 @@ function runFullAnalysis() {
             : '<strong>Observation:</strong> Increasing TLB size does not always improve hit rate — it depends on the access pattern.'}</p>
     `;
 
-    // ── 4. BASELINE COMPARISON ──
     const ematNoTlb = MEMORY_ACCESS_TIME;
     const baseBody = document.getElementById('baselineBody');
     baseBody.innerHTML = `
@@ -715,10 +1148,8 @@ function runFullAnalysis() {
         </tr>
     `;
 
-    // ── 5. CHARTS ──
-    renderCharts(compSizes, compResults, numPages, pageSize, policy, addresses);
+    renderCharts(numPages, pageSize, policy, addresses);
 
-    // ── 6. STEP-BY-STEP TRACE ──
     const traceBody = document.getElementById('traceBody');
     traceBody.innerHTML = '';
     sim.results.forEach((r, i) => {
@@ -734,13 +1165,11 @@ function runFullAnalysis() {
         </tr>`;
     });
 
-    // ── 7. ANALYSIS / INTERPRETATION ──
     const uniquePages = new Set(addresses.map(a => Math.floor(a / pageSize))).size;
     const analysisList = document.getElementById('analysisList');
 
-    // Run both policies for comparison insight
-    const fifoSim = simulate({ numPages, pageSize, tlbSize, policy: 'FIFO', addresses });
-    const lruSim = simulate({ numPages, pageSize, tlbSize, policy: 'LRU', addresses });
+    const fifoSim = simulateTLB({ numPages, pageSize, tlbSize: effectiveTlbSize, policy: 'FIFO', addresses });
+    const lruSim = simulateTLB({ numPages, pageSize, tlbSize: effectiveTlbSize, policy: 'LRU', addresses });
     let policyInsight;
     if (fifoSim.hitRate > lruSim.hitRate) {
         policyInsight = `For this access pattern, <strong>FIFO outperforms LRU</strong> (FIFO hit rate: ${(fifoSim.hitRate*100).toFixed(1)}%, LRU: ${(lruSim.hitRate*100).toFixed(1)}%). This can happen when frequently accessed pages were loaded early and remain in the FIFO queue.`;
@@ -750,7 +1179,17 @@ function runFullAnalysis() {
         policyInsight = `Both <strong>FIFO and LRU produce the same hit rate</strong> (${(fifoSim.hitRate*100).toFixed(1)}%) for this access pattern. This often happens with small TLB sizes or uniform access patterns.`;
     }
 
+    let edgeCaseNotes = '';
+    if (effectiveTlbSize === 0) {
+        edgeCaseNotes = `<li><span class="analysis-key">Edge Case</span>TLB size is 0, so every memory access incurs the full memory access penalty. The EMAT equals <strong>${MEMORY_ACCESS_TIME} time units</strong>, identical to a system with no TLB at all.</li>`;
+    } else if (sim.hitRate === 1) {
+        edgeCaseNotes = `<li><span class="analysis-key">Edge Case</span>Achieved a <strong>100% hit rate</strong>. Every access after initial compulsory misses was served from the TLB. This typically occurs when the TLB is large enough to hold the entire working set and the access pattern is repetitive.</li>`;
+    } else if (sim.hitRate === 0) {
+        edgeCaseNotes = `<li><span class="analysis-key">Edge Case</span>The hit rate is <strong>0%</strong> — no TLB hits occurred. This can happen if every access targets a unique page or the TLB is too small to retain any useful mappings before they are evicted.</li>`;
+    }
+
     analysisList.innerHTML = `
+        ${edgeCaseNotes}
         <li>
             <span class="analysis-key">TLB Size Effect</span>
             A larger TLB can store more page-to-frame mappings simultaneously. With ${uniquePages} unique pages in this access sequence, a TLB of size ${best.size} achieved the best hit rate of <strong>${(best.hitRate*100).toFixed(1)}%</strong>. When the TLB is too small to hold the working set, evictions cause repeated misses on the same pages.
@@ -773,23 +1212,249 @@ function runFullAnalysis() {
         </li>
     `;
 
-    // Show output
     document.getElementById('output').classList.add('visible');
     document.getElementById('panelSummary').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ════════════════════════════════════════════
-//  CHARTS
-// ════════════════════════════════════════════
+function renderFormulaExplanation(hitRate, missRate, emat) {
+    const hitComponent = hitRate * TLB_ACCESS_TIME;
+    const missComponent = missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME);
 
-function renderCharts(compSizes, compResults, numPages, pageSize, policy, addresses) {
-    // Sweep all sizes 1..numPages for smooth charts
-    const allSizes = [], allHitRates = [], allEmats = [];
+    document.getElementById('formulaBox').innerHTML = `
+        <div class="formula-main">
+            EMAT = (Hit Rate × T<sub>TLB</sub>) + (Miss Rate × (T<sub>TLB</sub> + T<sub>Memory</sub>))
+        </div>
+        <div class="formula-steps">
+            <div class="formula-step">Hit Rate = ${(hitRate * 100).toFixed(1)}% = ${hitRate.toFixed(4)}</div>
+            <div class="formula-step">Miss Rate = ${(missRate * 100).toFixed(1)}% = ${missRate.toFixed(4)}</div>
+            <div class="formula-step">T<sub>TLB</sub> = ${TLB_ACCESS_TIME} &nbsp;|&nbsp; T<sub>Memory</sub> = ${MEMORY_ACCESS_TIME}</div>
+            <div class="formula-step" style="margin-top:8px;">
+                EMAT = (${hitRate.toFixed(4)} × ${TLB_ACCESS_TIME}) + (${missRate.toFixed(4)} × (${TLB_ACCESS_TIME} + ${MEMORY_ACCESS_TIME}))
+            </div>
+            <div class="formula-step">
+                EMAT = ${hitComponent.toFixed(4)} + (${missRate.toFixed(4)} × ${TLB_ACCESS_TIME + MEMORY_ACCESS_TIME})
+            </div>
+            <div class="formula-step">
+                EMAT = ${hitComponent.toFixed(4)} + ${missComponent.toFixed(4)}
+            </div>
+            <div class="formula-step">
+                EMAT = <span class="eq-result">${emat.toFixed(4)} time units</span>
+            </div>
+        </div>
+    `;
+}
+
+function initSimulation(config, sim) {
+    if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+    }
+
+    simState = {
+        config,
+        sim,
+        currentStep: 0,
+        totalSteps: sim.results.length,
+        runningHits: 0,
+        runningMisses: 0
+    };
+
+    document.getElementById('simStepContainer').innerHTML = '';
+    document.getElementById('simProgressBar').style.width = '0%';
+    document.getElementById('simCounter').textContent = `0 / ${simState.totalSteps}`;
+    document.getElementById('simHits').textContent = '0';
+    document.getElementById('simMisses').textContent = '0';
+    document.getElementById('simRate').textContent = '0%';
+    document.getElementById('btnNextStep').disabled = false;
+    document.getElementById('btnAutoPlay').disabled = false;
+    document.getElementById('btnAutoPlay').textContent = 'Auto Play';
+}
+
+function simNextStep() {
+    if (!simState || simState.currentStep >= simState.totalSteps) return;
+
+    const step = simState.sim.results[simState.currentStep];
+    const stepNum = simState.currentStep + 1;
+
+    if (step.hit) simState.runningHits++;
+    else simState.runningMisses++;
+
+    const total = simState.runningHits + simState.runningMisses;
+    const rate = calculateHitRate(simState.runningHits, total);
+
+    const tlbBeforeEntries = Object.entries(step.tlbBefore);
+    const tlbAfterEntries = Object.entries(step.tlb);
+    const beforeKeys = new Set(tlbBeforeEntries.map(([k]) => k));
+
+    const beforeHtml = tlbBeforeEntries.length > 0
+        ? tlbBeforeEntries.map(([k, v]) => `<span class="sim-tlb-entry">${k}→${v}</span>`).join('')
+        : '<span class="sim-tlb-empty">empty</span>';
+
+    const afterHtml = tlbAfterEntries.length > 0
+        ? tlbAfterEntries.map(([k, v]) => {
+            const isNew = !beforeKeys.has(k);
+            return `<span class="sim-tlb-entry${isNew ? ' new-entry' : ''}">${k}→${v}</span>`;
+        }).join('')
+        : '<span class="sim-tlb-empty">empty</span>';
+
+    const cardHtml = `
+        <div class="sim-step-card ${step.hit ? 'step-hit' : 'step-miss'}" id="simStep${stepNum}">
+            <div class="sim-step-header">
+                <span class="sim-step-num">Step ${stepNum}</span>
+                ${step.hit ? '<span class="tag tag-hit">HIT</span>' : '<span class="tag tag-miss">MISS</span>'}
+            </div>
+            <div class="sim-step-detail">
+                <div class="sim-detail-item">
+                    <div class="sim-detail-label">Address</div>
+                    <div class="sim-detail-value">${step.addr}</div>
+                </div>
+                <div class="sim-detail-item">
+                    <div class="sim-detail-label">Page #</div>
+                    <div class="sim-detail-value">${step.page}</div>
+                </div>
+                <div class="sim-detail-item">
+                    <div class="sim-detail-label">Offset</div>
+                    <div class="sim-detail-value">${step.offset}</div>
+                </div>
+                <div class="sim-detail-item">
+                    <div class="sim-detail-label">Frame</div>
+                    <div class="sim-detail-value">${step.frame}</div>
+                </div>
+            </div>
+            <div class="sim-tlb-state">
+                <div>
+                    <div class="sim-tlb-col-label">TLB Before</div>
+                    <div class="sim-tlb-entries">${beforeHtml}</div>
+                </div>
+                <div>
+                    <div class="sim-tlb-col-label">TLB After</div>
+                    <div class="sim-tlb-entries">${afterHtml}</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const container = document.getElementById('simStepContainer');
+    container.insertAdjacentHTML('beforeend', cardHtml);
+
+    const newCard = document.getElementById(`simStep${stepNum}`);
+    newCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    simState.currentStep++;
+
+    const progress = (simState.currentStep / simState.totalSteps) * 100;
+    document.getElementById('simProgressBar').style.width = progress + '%';
+    document.getElementById('simCounter').textContent = `${simState.currentStep} / ${simState.totalSteps}`;
+    document.getElementById('simHits').textContent = simState.runningHits;
+    document.getElementById('simMisses').textContent = simState.runningMisses;
+    document.getElementById('simRate').textContent = (rate * 100).toFixed(1) + '%';
+
+    if (simState.currentStep >= simState.totalSteps) {
+        document.getElementById('btnNextStep').disabled = true;
+        document.getElementById('btnAutoPlay').disabled = true;
+        if (autoPlayTimer) {
+            clearInterval(autoPlayTimer);
+            autoPlayTimer = null;
+            document.getElementById('btnAutoPlay').textContent = 'Auto Play';
+        }
+    }
+}
+
+function simAutoPlay() {
+    if (!simState) return;
+
+    if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+        document.getElementById('btnAutoPlay').textContent = 'Auto Play';
+        return;
+    }
+
+    document.getElementById('btnAutoPlay').textContent = 'Pause';
+
+    autoPlayTimer = setInterval(() => {
+        if (!simState || simState.currentStep >= simState.totalSteps) {
+            clearInterval(autoPlayTimer);
+            autoPlayTimer = null;
+            document.getElementById('btnAutoPlay').textContent = 'Auto Play';
+            return;
+        }
+        simNextStep();
+    }, 600);
+}
+
+function simReset() {
+    if (!simState) return;
+    if (autoPlayTimer) {
+        clearInterval(autoPlayTimer);
+        autoPlayTimer = null;
+    }
+    initSimulation(simState.config, simState.sim);
+}
+
+function updateComparison() {
+    const config = window._lastConfig;
+    const sim = window._lastSim;
+    if (!config || !sim) return;
+
+    const withTlb = document.getElementById('compWithTlb').checked;
+    const withoutTlb = document.getElementById('compWithoutTlb').checked;
+
+    const grid = document.getElementById('compModeGrid');
+
+    const ematWith = sim.emat;
+    const ematWithout = MEMORY_ACCESS_TIME;
+    const improvement = ematWithout > 0 ? ((ematWithout - ematWith) / ematWithout * 100) : 0;
+
+    let html = '';
+
+    if (withTlb) {
+        html += `
+            <div class="comp-card">
+                <div class="comp-card-title">With TLB</div>
+                <div class="comp-card-val val-hit">${ematWith.toFixed(2)}</div>
+                <div class="comp-card-sub">EMAT (time units)</div>
+            </div>
+        `;
+    }
+
+    if (withoutTlb) {
+        html += `
+            <div class="comp-card">
+                <div class="comp-card-title">Without TLB</div>
+                <div class="comp-card-val val-miss">${ematWithout.toFixed(2)}</div>
+                <div class="comp-card-sub">EMAT (time units)</div>
+            </div>
+        `;
+    }
+
+    if (withTlb && withoutTlb) {
+        html += `
+            <div class="comp-card">
+                <div class="comp-card-title">Improvement</div>
+                <div class="comp-card-val val-accent">${improvement.toFixed(1)}%</div>
+                <div class="comp-card-sub">${(ematWithout / ematWith).toFixed(2)}× speedup</div>
+            </div>
+        `;
+    }
+
+    grid.innerHTML = html;
+}
+
+function renderCharts(numPages, pageSize, policy, addresses) {
+    const allSizes = [], allHitRates = [];
     for (let sz = 1; sz <= numPages; sz++) {
-        const r = simulate({ numPages, pageSize, tlbSize: sz, policy, addresses });
+        const r = simulateTLB({ numPages, pageSize, tlbSize: sz, policy, addresses });
         allSizes.push(sz);
-        allHitRates.push((r.hitRate * 100).toFixed(1));
-        allEmats.push(r.emat.toFixed(2));
+        allHitRates.push(parseFloat((r.hitRate * 100).toFixed(1)));
+    }
+
+    const missRates = [], accessTimes = [];
+    for (let m = 0; m <= 100; m += 5) {
+        const mr = m / 100;
+        const hr = 1 - mr;
+        missRates.push(mr.toFixed(2));
+        accessTimes.push(parseFloat(calculateEMAT(hr, mr).toFixed(2)));
     }
 
     const baseOpts = {
@@ -823,7 +1488,6 @@ function renderCharts(compSizes, compResults, numPages, pageSize, policy, addres
         padding: 10,
     };
 
-    // Hit Rate chart
     if (chartHR) chartHR.destroy();
     chartHR = new Chart(document.getElementById('chartHitRate'), {
         type: 'bar',
@@ -843,21 +1507,27 @@ function renderCharts(compSizes, compResults, numPages, pageSize, policy, addres
             ...baseOpts,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'TLB Size vs Hit Rate (%)', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
+                title: { display: true, text: 'Hit Rate vs TLB Size', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
                 tooltip: tooltipStyle,
             },
-            scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, min: 0, max: 110, title: { display: true, text: 'Hit Rate (%)', color: '#50505e', font: { family: 'Inter', size: 11 } } } },
+            scales: {
+                ...baseOpts.scales,
+                y: {
+                    ...baseOpts.scales.y,
+                    min: 0, max: 110,
+                    title: { display: true, text: 'Hit Rate (%)', color: '#50505e', font: { family: 'Inter', size: 11 } }
+                }
+            },
         },
     });
 
-    // EMAT chart
-    if (chartEM) chartEM.destroy();
-    chartEM = new Chart(document.getElementById('chartEmat'), {
+    if (chartAT) chartAT.destroy();
+    chartAT = new Chart(document.getElementById('chartAccessTime'), {
         type: 'line',
         data: {
-            labels: allSizes,
+            labels: missRates,
             datasets: [{
-                data: allEmats,
+                data: accessTimes,
                 borderColor: '#fd79a8',
                 backgroundColor: 'rgba(253,121,168,0.05)',
                 borderWidth: 2,
@@ -870,20 +1540,30 @@ function renderCharts(compSizes, compResults, numPages, pageSize, policy, addres
             }],
         },
         options: {
-            ...baseOpts,
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'TLB Size vs EMAT (time units)', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
+                title: { display: true, text: 'Access Time vs Miss Rate', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
                 tooltip: tooltipStyle,
             },
-            scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, title: { display: true, text: 'EMAT', color: '#50505e', font: { family: 'Inter', size: 11 } } } },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Miss Rate', color: '#50505e', font: { family: 'Inter', size: 11 } },
+                    ticks: { color: '#50505e', font: { family: 'Inter', size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                    border: { color: 'rgba(255,255,255,0.06)' },
+                },
+                y: {
+                    title: { display: true, text: 'EMAT (time units)', color: '#50505e', font: { family: 'Inter', size: 11 } },
+                    ticks: { color: '#50505e', font: { family: 'Inter', size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.03)' },
+                    border: { color: 'rgba(255,255,255,0.06)' },
+                },
+            },
         },
     });
 }
-
-// ════════════════════════════════════════════
-//  HELPERS
-// ════════════════════════════════════════════
 
 function toggleTrace() {
     const content = document.getElementById('traceContent');
@@ -897,13 +1577,19 @@ function loadExample() {
     document.getElementById('numAccesses').value = 20;
     document.getElementById('policy').value = 'FIFO';
     document.getElementById('addresses').value = '10, 22, 15, 10, 45, 22, 55, 10, 22, 78, 15, 45, 90, 22, 10, 55, 78, 45, 10, 22';
+    document.getElementById('presetWorkload').value = '';
 }
 
 function clearAll() {
     document.getElementById('output').classList.remove('visible');
     if (chartHR) { chartHR.destroy(); chartHR = null; }
-    if (chartEM) { chartEM.destroy(); chartEM = null; }
+    if (chartAT) { chartAT.destroy(); chartAT = null; }
+    if (autoPlayTimer) { clearInterval(autoPlayTimer); autoPlayTimer = null; }
+    simState = null;
+    window._lastConfig = null;
+    window._lastSim = null;
 }
+
 </script>
 </body>
 </html>
