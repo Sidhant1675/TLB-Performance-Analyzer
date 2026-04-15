@@ -3,200 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Simulate TLB behavior and analyze memory access performance with hit rate, miss rate, and EMAT calculations. Supports FIFO and LRU replacement policies.">
+    <meta name="description" content="TLB Performance Analyzer — Simulate TLB behavior, compare replacement policies, and analyze memory access performance with EMAT calculations.">
     <title>TLB Performance Analyzer</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-card: #16161f;
-            --bg-card-hover: #1a1a25;
-            --bg-input: #111118;
-            --border-subtle: rgba(255, 255, 255, 0.06);
-            --border-hover: rgba(255, 255, 255, 0.12);
-            --text-primary: #e8e8ed;
-            --text-secondary: #9393a8;
-            --text-muted: #5e5e73;
-            --accent-primary: #6c5ce7;
-            --accent-secondary: #a29bfe;
-            --accent-glow: rgba(108, 92, 231, 0.15);
-            --hit-color: #00cec9;
-            --hit-bg: rgba(0, 206, 201, 0.08);
-            --hit-border: rgba(0, 206, 201, 0.2);
-            --miss-color: #fd79a8;
-            --miss-bg: rgba(253, 121, 168, 0.08);
-            --miss-border: rgba(253, 121, 168, 0.2);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3);
-            --shadow-glow: 0 0 40px rgba(108, 92, 231, 0.1);
-            --transition-fast: 0.15s ease;
-            --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --bg: #0b0b10;
+            --bg-card: #131318;
+            --bg-input: #0e0e14;
+            --border: rgba(255,255,255,0.07);
+            --border-focus: #6c5ce7;
+            --text: #d8d8e0;
+            --text-dim: #7a7a90;
+            --text-muted: #50505e;
+            --accent: #6c5ce7;
+            --accent-light: #a29bfe;
+            --hit: #00cec9;
+            --miss: #fd79a8;
+            --radius: 10px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.65;
             min-height: 100vh;
-            line-height: 1.6;
-            overflow-x: hidden;
         }
 
-        /* ── Ambient Background ── */
-        .bg-ambient {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .bg-orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(120px);
-            opacity: 0.4;
-            animation: orbFloat 20s ease-in-out infinite;
-        }
-
-        .bg-orb-1 {
-            width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(108, 92, 231, 0.12), transparent 70%);
-            top: -10%; left: -5%;
-            animation-delay: 0s;
-        }
-
-        .bg-orb-2 {
-            width: 400px; height: 400px;
-            background: radial-gradient(circle, rgba(0, 206, 201, 0.08), transparent 70%);
-            bottom: -10%; right: -5%;
-            animation-delay: -7s;
-        }
-
-        .bg-orb-3 {
-            width: 350px; height: 350px;
-            background: radial-gradient(circle, rgba(253, 121, 168, 0.06), transparent 70%);
-            top: 40%; left: 50%;
-            animation-delay: -14s;
-        }
-
-        @keyframes orbFloat {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(30px, -20px) scale(1.05); }
-            66% { transform: translate(-20px, 15px) scale(0.95); }
-        }
-
-        /* ── Container ── */
         .container {
-            max-width: 1080px;
+            max-width: 960px;
             margin: 0 auto;
-            padding: 48px 28px 64px;
-            position: relative;
-            z-index: 1;
+            padding: 48px 24px 72px;
         }
 
         /* ── Header ── */
-        .header {
-            text-align: center;
-            margin-bottom: 48px;
-        }
-
-        .header-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            background: var(--accent-glow);
-            border: 1px solid rgba(108, 92, 231, 0.2);
-            border-radius: 100px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            color: var(--accent-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            margin-bottom: 16px;
-        }
-
-        .header-badge::before {
-            content: '';
-            width: 6px; height: 6px;
-            background: var(--accent-primary);
-            border-radius: 50%;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
-        }
+        .header { text-align: center; margin-bottom: 40px; }
 
         h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
+            font-size: 1.65rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #eee;
+            margin-bottom: 6px;
         }
 
         .subtitle {
-            font-size: 0.92rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
-            font-weight: 400;
-            max-width: 500px;
-            margin: 0 auto;
         }
 
-        /* ── Config Panel ── */
-        .config-panel {
+        /* ── Panels ── */
+        .panel {
             background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            padding: 28px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow-card);
-            transition: border-color var(--transition-smooth);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
         }
 
-        .config-panel:hover {
-            border-color: var(--border-hover);
-        }
-
-        .panel-label {
-            font-size: 0.7rem;
+        .panel-title {
+            font-size: 0.72rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            letter-spacing: 0.08em;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .panel-label::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border-subtle);
-        }
-
-        .config-grid {
+        /* ── Input Grid ── */
+        .input-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
             gap: 14px;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
         }
 
         .field label {
@@ -205,497 +92,286 @@
             font-weight: 500;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
         }
 
         .field input, .field select {
             width: 100%;
-            padding: 10px 14px;
+            padding: 9px 12px;
             background: var(--bg-input);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            font-family: 'JetBrains Mono', 'Consolas', monospace;
-            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
             outline: none;
-            transition: all var(--transition-fast);
+            transition: border-color 0.15s;
         }
 
         .field input:focus, .field select:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px var(--accent-glow);
+            border-color: var(--border-focus);
         }
 
         .field select {
             cursor: pointer;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235e5e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2350505e' stroke-width='2'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 36px;
+            background-position: right 10px center;
+            padding-right: 30px;
         }
 
-        .field select option {
-            background: var(--bg-card);
-            color: var(--text-primary);
-        }
+        .field select option { background: var(--bg-card); color: var(--text); }
 
-        .addr-field {
-            margin-bottom: 4px;
-        }
+        .addr-row { margin-bottom: 4px; }
 
-        .addr-field input {
-            width: 100%;
-            padding: 10px 14px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-size: 0.88rem;
-            font-family: 'JetBrains Mono', 'Consolas', monospace;
-            font-weight: 500;
-            outline: none;
-            transition: all var(--transition-fast);
-        }
-
-        .addr-field input:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-
-        .addr-field label {
+        .addr-row label {
             display: block;
             font-size: 0.7rem;
             font-weight: 500;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 8px;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
         }
 
-        .hint {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            margin-top: 6px;
-            opacity: 0.7;
+        .addr-row input {
+            width: 100%;
+            padding: 9px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: border-color 0.15s;
         }
+
+        .addr-row input:focus { border-color: var(--border-focus); }
+
+        .hint { font-size: 0.7rem; color: var(--text-muted); margin-top: 5px; }
 
         /* ── Buttons ── */
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 24px;
-        }
+        .btn-row { display: flex; gap: 10px; margin-top: 20px; }
 
         button {
-            padding: 11px 28px;
+            padding: 10px 22px;
             border: none;
-            border-radius: var(--radius-sm);
-            font-size: 0.82rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
-            transition: all var(--transition-smooth);
-            position: relative;
-            overflow: hidden;
+            transition: opacity 0.15s;
         }
 
-        button:active { transform: scale(0.97); }
+        button:hover { opacity: 0.88; }
 
-        .btn-run {
-            background: linear-gradient(135deg, var(--accent-primary), #7c6cf0);
-            color: #fff;
-            box-shadow: 0 4px 20px rgba(108, 92, 231, 0.3);
-        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-secondary { background: #1e1e28; color: var(--text-dim); border: 1px solid var(--border); }
 
-        .btn-run:hover {
-            box-shadow: 0 6px 28px rgba(108, 92, 231, 0.45);
-            transform: translateY(-1px);
-        }
+        /* ── Output Sections ── */
+        .output { display: none; }
+        .output.visible { display: block; }
 
-        .btn-run::after {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn-run:hover::after { left: 100%; }
-
-        .btn-example {
-            background: var(--bg-input);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-subtle);
-        }
-
-        .btn-example:hover {
-            background: var(--bg-card-hover);
-            border-color: var(--border-hover);
-            color: var(--text-primary);
-        }
-
-        .btn-clear {
-            background: transparent;
-            color: var(--text-muted);
-            border: 1px solid var(--border-subtle);
-        }
-
-        .btn-clear:hover {
-            border-color: rgba(253, 121, 168, 0.3);
-            color: var(--miss-color);
-        }
-
-        .btn-compare {
-            background: var(--bg-input);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-subtle);
-        }
-
-        .btn-compare:hover {
-            background: var(--bg-card-hover);
-            border-color: rgba(0, 206, 201, 0.3);
-            color: var(--hit-color);
-        }
-
-        /* ── Results Section ── */
-        .results {
-            display: none;
-            animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .results.visible { display: block; }
-
-        @keyframes fadeSlideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .section-title {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .section-title::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border-subtle);
-        }
-
-        /* ── Summary Cards ── */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 12px;
-            margin-bottom: 36px;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 20px 16px;
-            text-align: center;
-            transition: all var(--transition-smooth);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
-            opacity: 0;
-            transition: opacity var(--transition-smooth);
-        }
-
-        .card:hover {
-            border-color: var(--border-hover);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-card);
-        }
-
-        .card:hover::before { opacity: 1; }
-
-        .card-value {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            font-family: 'JetBrains Mono', monospace;
-            line-height: 1.2;
-        }
-
-        .card-value.hit { color: var(--hit-color); }
-        .card-value.miss { color: var(--miss-color); }
-        .card-value.accent { color: var(--accent-secondary); }
-
-        .card-label {
-            font-size: 0.68rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-top: 6px;
-        }
-
-        /* ── Charts ── */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 36px;
-        }
-
-        .chart-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 24px;
-            transition: all var(--transition-smooth);
-        }
-
-        .chart-box:hover {
-            border-color: var(--border-hover);
-        }
-
-        .chart-box canvas {
-            width: 100% !important;
-            height: 280px !important;
-        }
-
-        /* ── Trace Table ── */
-        .trace-wrap {
-            margin-bottom: 36px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            overflow: hidden;
-        }
-
-        .trace-scroll {
-            overflow-x: auto;
-            max-height: 480px;
-            overflow-y: auto;
-        }
-
-        .trace-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .trace-scroll::-webkit-scrollbar-track { background: transparent; }
-        .trace-scroll::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
+        /* ── Tables ── */
+        .tbl-wrap { overflow-x: auto; }
 
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.82rem;
-            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-family: 'JetBrains Mono', monospace;
         }
-
-        thead { position: sticky; top: 0; z-index: 2; }
 
         th {
             text-align: left;
-            padding: 12px 14px;
-            color: var(--text-muted);
-            font-weight: 600;
+            padding: 10px 12px;
             font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-subtle);
+            letter-spacing: 0.05em;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid var(--border);
         }
 
         td {
-            padding: 10px 14px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            color: var(--text-secondary);
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            color: var(--text-dim);
         }
 
-        tr { transition: background var(--transition-fast); }
-        tr:hover td { background: rgba(108, 92, 231, 0.03); }
+        tr:hover td { background: rgba(255,255,255,0.015); }
 
         .tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 10px;
-            border-radius: 100px;
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
             font-size: 0.7rem;
             font-weight: 600;
-            letter-spacing: 0.04em;
         }
 
-        .tag-hit {
-            background: var(--hit-bg);
-            color: var(--hit-color);
-            border: 1px solid var(--hit-border);
+        .tag-hit { background: rgba(0,206,201,0.1); color: var(--hit); }
+        .tag-miss { background: rgba(253,121,168,0.1); color: var(--miss); }
+
+        .val-hit { color: var(--hit); }
+        .val-miss { color: var(--miss); }
+        .val-accent { color: var(--accent-light); }
+
+        .best-row td { color: var(--text); font-weight: 600; }
+
+        /* ── Metric Cards ── */
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
-        .tag-miss {
-            background: var(--miss-bg);
-            color: var(--miss-color);
-            border: 1px solid var(--miss-border);
+        .metric {
+            text-align: center;
+            padding: 16px 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            border: 1px solid var(--border);
         }
 
-        .tlb-state {
+        .metric-val {
+            font-size: 1.35rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text);
+        }
+
+        .metric-label {
+            font-size: 0.66rem;
+            font-weight: 500;
             color: var(--text-muted);
-            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
         }
 
-        /* ── Comparison Section ── */
-        .comparison-section {
-            display: none;
-            animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        /* ── Baseline Table ── */
+        .baseline-tbl td:first-child { font-weight: 500; color: var(--text); }
+
+        /* ── Analysis ── */
+        .analysis-list {
+            list-style: none;
+            padding: 0;
         }
 
-        .comparison-section.visible { display: block; }
+        .analysis-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 0.84rem;
+            color: var(--text-dim);
+            line-height: 1.7;
+        }
 
-        .comparison-grid {
+        .analysis-list li:last-child { border-bottom: none; }
+
+        .analysis-list li strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .analysis-key {
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            background: rgba(108,92,231,0.1);
+            color: var(--accent-light);
+        }
+
+        /* ── Chart ── */
+        .chart-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
-            margin-bottom: 36px;
         }
 
-        .comparison-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 24px;
-            transition: all var(--transition-smooth);
+        .chart-box {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
         }
 
-        .comparison-card:hover {
-            border-color: var(--border-hover);
+        .chart-box canvas {
+            width: 100% !important;
+            height: 260px !important;
         }
 
-        .comparison-card-title {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 16px;
+        /* ── Trace toggle ── */
+        .trace-toggle {
             display: flex;
             align-items: center;
             gap: 8px;
+            margin-bottom: 14px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            user-select: none;
         }
 
-        .comparison-card-title .dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-        }
+        .trace-toggle input { accent-color: var(--accent); cursor: pointer; }
 
-        .dot-fifo { background: var(--accent-secondary); }
-        .dot-lru { background: var(--hit-color); }
+        .trace-body { max-height: 420px; overflow-y: auto; }
+        .trace-body::-webkit-scrollbar { width: 5px; }
+        .trace-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 
-        .comparison-stat {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .comparison-stat:last-child { border-bottom: none; }
-
-        .comparison-stat-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .comparison-stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .winner-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            background: var(--hit-bg);
-            color: var(--hit-color);
-            border: 1px solid var(--hit-border);
-            margin-top: 12px;
-        }
-
-        .comparison-chart-box {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 24px;
-            margin-bottom: 36px;
-        }
-
-        .comparison-chart-box canvas {
-            width: 100% !important;
-            height: 300px !important;
-        }
-
-        /* ── Footer ── */
-        .footer {
-            text-align: center;
-            padding-top: 32px;
-            border-top: 1px solid var(--border-subtle);
+        /* ── Observations ── */
+        .obs-box {
+            background: rgba(108, 92, 231, 0.04);
+            border: 1px solid rgba(108,92,231,0.12);
+            border-radius: 8px;
+            padding: 16px 20px;
             margin-top: 16px;
         }
 
-        .footer p {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            opacity: 0.6;
+        .obs-box p {
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            margin-bottom: 4px;
         }
 
+        .obs-box p:last-child { margin-bottom: 0; }
+
+        .obs-box strong { color: var(--text); }
+
         /* ── Responsive ── */
-        @media (max-width: 768px) {
-            .container { padding: 28px 16px 48px; }
-            h1 { font-size: 1.6rem; }
-            .config-grid { grid-template-columns: repeat(2, 1fr); }
-            .summary-grid { grid-template-columns: repeat(3, 1fr); }
-            .charts-grid { grid-template-columns: 1fr; }
-            .comparison-grid { grid-template-columns: 1fr; }
-            .btn-row { flex-wrap: wrap; }
+        @media (max-width: 700px) {
+            .input-grid { grid-template-columns: repeat(2, 1fr); }
+            .chart-container { grid-template-columns: 1fr; }
+            .metric-row { grid-template-columns: repeat(3, 1fr); }
         }
 
         @media (max-width: 480px) {
-            .config-grid { grid-template-columns: 1fr; }
-            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+            .input-grid { grid-template-columns: 1fr; }
+            .metric-row { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
 <body>
-    <div class="bg-ambient">
-        <div class="bg-orb bg-orb-1"></div>
-        <div class="bg-orb bg-orb-2"></div>
-        <div class="bg-orb bg-orb-3"></div>
-    </div>
-
     <div class="container">
-        <!-- Header -->
         <div class="header">
-            <div class="header-badge">System Simulator</div>
             <h1>TLB Performance Analyzer</h1>
-            <p class="subtitle">Simulate Translation Lookaside Buffer behavior and analyze its impact on memory access performance</p>
+            <p class="subtitle">Simulate, compare, and analyze TLB memory access performance</p>
         </div>
 
-        <!-- Configuration -->
-        <div class="config-panel">
-            <div class="panel-label">Configuration</div>
-            <div class="config-grid">
+        <!-- ─── INPUT CONFIGURATION ─── -->
+        <div class="panel">
+            <div class="panel-title">Input Configuration</div>
+            <div class="input-grid">
                 <div class="field">
                     <label for="numPages">Pages</label>
                     <input type="number" id="numPages" value="10" min="1">
@@ -706,7 +382,7 @@
                 </div>
                 <div class="field">
                     <label for="tlbSize">TLB Size</label>
-                    <input type="number" id="tlbSize" value="3" min="1">
+                    <input type="number" id="tlbSize" value="4" min="1">
                 </div>
                 <div class="field">
                     <label for="numAccesses">Accesses</label>
@@ -720,669 +396,514 @@
                     </select>
                 </div>
             </div>
-
-            <div class="addr-field">
+            <div class="addr-row">
                 <label for="addresses">Virtual Addresses</label>
                 <input type="text" id="addresses" placeholder="e.g. 10, 22, 15, 10, 45, 22">
                 <p class="hint">Comma-separated integers. Leave blank to auto-generate random addresses.</p>
             </div>
-
             <div class="btn-row">
-                <button class="btn-run" id="btnRun" onclick="runSimulation()">
-                    ▶ Run Simulation
-                </button>
-                <button class="btn-compare" onclick="runComparison()">
-                    ⇄ Compare FIFO vs LRU
-                </button>
-                <button class="btn-example" onclick="loadExample()">
-                    ◇ Load Example
-                </button>
-                <button class="btn-clear" onclick="clearResults()">
-                    ✕ Clear
-                </button>
+                <button class="btn-primary" id="btnRun" onclick="runFullAnalysis()">Run Analysis</button>
+                <button class="btn-secondary" onclick="loadExample()">Load Example</button>
+                <button class="btn-secondary" onclick="clearAll()">Clear</button>
             </div>
         </div>
 
-        <!-- Results -->
-        <div class="results" id="results">
-            <div class="section-title">Summary</div>
-            <div class="summary-grid">
-                <div class="card">
-                    <div class="card-value" id="totalAccesses">-</div>
-                    <div class="card-label">Total</div>
-                </div>
-                <div class="card">
-                    <div class="card-value hit" id="totalHits">-</div>
-                    <div class="card-label">Hits</div>
-                </div>
-                <div class="card">
-                    <div class="card-value miss" id="totalMisses">-</div>
-                    <div class="card-label">Misses</div>
-                </div>
-                <div class="card">
-                    <div class="card-value accent" id="hitRate">-</div>
-                    <div class="card-label">Hit Rate</div>
-                </div>
-                <div class="card">
-                    <div class="card-value" id="ematValue">-</div>
-                    <div class="card-label">EMAT</div>
-                </div>
-                <div class="card">
-                    <div class="card-value accent" id="speedup">-</div>
-                    <div class="card-label">Speedup</div>
-                </div>
+        <!-- ─── OUTPUT ─── -->
+        <div class="output" id="output">
+
+            <!-- 1. Input Summary -->
+            <div class="panel" id="panelSummary">
+                <div class="panel-title">Input Summary</div>
+                <div class="metric-row" id="inputSummaryMetrics"></div>
+                <p id="addressList" style="font-size:0.78rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; word-break:break-all;"></p>
             </div>
 
-            <div class="section-title">Charts</div>
-            <div class="charts-grid">
-                <div class="chart-box">
-                    <canvas id="chartCumulative"></canvas>
-                </div>
-                <div class="chart-box">
-                    <canvas id="chartTlbSize"></canvas>
-                </div>
+            <!-- 2. Results Table (primary TLB size) -->
+            <div class="panel" id="panelResults">
+                <div class="panel-title">Simulation Results</div>
+                <div class="metric-row" id="resultMetrics"></div>
             </div>
 
-            <div class="section-title">Step-by-Step Trace</div>
-            <div class="trace-wrap">
-                <div class="trace-scroll">
-                    <table>
+            <!-- 3. Comparison Table (TLB sizes 2, 4, 8) -->
+            <div class="panel" id="panelComparison">
+                <div class="panel-title">Multi-Size TLB Comparison</div>
+                <div class="tbl-wrap">
+                    <table id="comparisonTable">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Address</th>
-                                <th>Page</th>
-                                <th>Offset</th>
-                                <th>Frame</th>
-                                <th>Result</th>
-                                <th>TLB State</th>
+                                <th>TLB Size</th>
+                                <th>Policy</th>
+                                <th>Hits</th>
+                                <th>Misses</th>
+                                <th>Hit Rate</th>
+                                <th>Miss Rate</th>
+                                <th>EMAT</th>
                             </tr>
                         </thead>
-                        <tbody id="traceBody"></tbody>
+                        <tbody id="comparisonBody"></tbody>
+                    </table>
+                </div>
+                <div class="obs-box" id="comparisonObs"></div>
+            </div>
+
+            <!-- 4. Baseline Comparison (Without TLB vs With TLB) -->
+            <div class="panel" id="panelBaseline">
+                <div class="panel-title">Baseline Comparison — With vs Without TLB</div>
+                <div class="tbl-wrap">
+                    <table class="baseline-tbl">
+                        <thead>
+                            <tr><th>Case</th><th>EMAT (time units)</th><th>Speedup</th></tr>
+                        </thead>
+                        <tbody id="baselineBody"></tbody>
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Comparison Section -->
-        <div class="comparison-section" id="comparisonSection">
-            <div class="section-title">FIFO vs LRU Comparison</div>
-            <div class="comparison-grid">
-                <div class="comparison-card" id="fifoCard">
-                    <div class="comparison-card-title">
-                        <span class="dot dot-fifo"></span> FIFO Policy
+            <!-- 5. Charts -->
+            <div class="panel" id="panelCharts">
+                <div class="panel-title">Performance Charts</div>
+                <div class="chart-container">
+                    <div class="chart-box">
+                        <canvas id="chartHitRate"></canvas>
                     </div>
-                    <div id="fifoStats"></div>
-                </div>
-                <div class="comparison-card" id="lruCard">
-                    <div class="comparison-card-title">
-                        <span class="dot dot-lru"></span> LRU Policy
+                    <div class="chart-box">
+                        <canvas id="chartEmat"></canvas>
                     </div>
-                    <div id="lruStats"></div>
                 </div>
             </div>
-            <div class="comparison-chart-box">
-                <canvas id="chartComparison"></canvas>
-            </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="footer" id="footer" style="display:none;">
-            <p>TLB Performance Analyzer — Simulating memory management for educational purposes</p>
+            <!-- 6. Step-by-Step Trace -->
+            <div class="panel" id="panelTrace">
+                <div class="panel-title">Step-by-Step Trace</div>
+                <label class="trace-toggle">
+                    <input type="checkbox" id="traceToggle" checked onchange="toggleTrace()">
+                    Show detailed trace for each memory access
+                </label>
+                <div id="traceContent" class="tbl-wrap">
+                    <div class="trace-body">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Address</th>
+                                    <th>Page</th>
+                                    <th>Offset</th>
+                                    <th>Frame</th>
+                                    <th>Result</th>
+                                    <th>TLB State</th>
+                                </tr>
+                            </thead>
+                            <tbody id="traceBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. Analysis -->
+            <div class="panel" id="panelAnalysis">
+                <div class="panel-title">Analysis &amp; Interpretation</div>
+                <ul class="analysis-list" id="analysisList"></ul>
+            </div>
         </div>
     </div>
 
-    <script>
-    // ── TLB Simulation Engine ──
+<script>
+// ════════════════════════════════════════════
+//  CORE SIMULATION ENGINE (unchanged logic)
+// ════════════════════════════════════════════
 
-    const TLB_ACCESS_TIME = 1;
-    const MEMORY_ACCESS_TIME = 10;
+const TLB_ACCESS_TIME = 1;
+const MEMORY_ACCESS_TIME = 10;
 
-    class PageTable {
-        constructor(numPages) {
-            this.table = {};
-            for (let i = 0; i < numPages; i++) this.table[i] = i;
-        }
-        lookup(page) { return this.table[page] ?? -1; }
+class PageTable {
+    constructor(numPages) {
+        this.table = {};
+        for (let i = 0; i < numPages; i++) this.table[i] = i;
+    }
+    lookup(page) { return this.table[page] ?? -1; }
+}
+
+class TLB {
+    constructor(size, policy) {
+        this.size = size;
+        this.policy = policy;
+        this.cache = new Map();
+        this.order = [];
     }
 
-    class TLBCache {
-        constructor(size, policy) {
-            this.size = size;
-            this.policy = policy;
-            this.cache = new Map();
-            this.order = [];
-        }
-
-        lookup(page) {
-            if (this.cache.has(page)) {
-                if (this.policy === 'LRU') {
-                    const frame = this.cache.get(page);
-                    this.cache.delete(page);
-                    this.cache.set(page, frame);
-                }
-                return this.cache.get(page);
-            }
-            return null;
-        }
-
-        insert(page, frame) {
-            if (this.cache.has(page)) {
+    lookup(page) {
+        if (this.cache.has(page)) {
+            if (this.policy === 'LRU') {
+                const frame = this.cache.get(page);
                 this.cache.delete(page);
                 this.cache.set(page, frame);
-                return;
             }
-            if (this.cache.size >= this.size) this._evict();
+            return this.cache.get(page);
+        }
+        return null;
+    }
+
+    insert(page, frame) {
+        if (this.cache.has(page)) {
+            this.cache.delete(page);
             this.cache.set(page, frame);
-            if (this.policy === 'FIFO') this.order.push(page);
+            return;
         }
-
-        _evict() {
-            if (this.policy === 'FIFO') {
-                const victim = this.order.shift();
-                this.cache.delete(victim);
-            } else {
-                const first = this.cache.keys().next().value;
-                this.cache.delete(first);
-            }
-        }
-
-        snapshot() {
-            const s = {};
-            for (const [k, v] of this.cache) s[k] = v;
-            return s;
-        }
-
-        reset() {
-            this.cache.clear();
-            this.order = [];
-        }
+        if (this.cache.size >= this.size) this._evict();
+        this.cache.set(page, frame);
+        if (this.policy === 'FIFO') this.order.push(page);
     }
 
-    function simulate(config) {
-        const pt = new PageTable(config.numPages);
-        const tlb = new TLBCache(config.tlbSize, config.policy);
-        const results = [];
-        let hits = 0, misses = 0;
-
-        for (const addr of config.addresses) {
-            const page = Math.floor(addr / config.pageSize);
-            const offset = addr % config.pageSize;
-            let frame = tlb.lookup(page);
-            let hit;
-
-            if (frame !== null) {
-                hit = true;
-                hits++;
-            } else {
-                hit = false;
-                misses++;
-                frame = pt.lookup(page);
-                if (frame !== -1) tlb.insert(page, frame);
-            }
-
-            results.push({ addr, page, offset, frame, hit, tlb: tlb.snapshot() });
-        }
-
-        const total = hits + misses;
-        const hitRate = total ? hits / total : 0;
-        const missRate = total ? misses / total : 0;
-        const emat = (hitRate * TLB_ACCESS_TIME) + (missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME));
-
-        return { results, hits, misses, total, hitRate, missRate, emat };
-    }
-
-    // ── Chart instances ──
-    let chartCum = null, chartBar = null, chartComp = null;
-
-    // ── Animated counter ──
-    function animateValue(el, end, suffix = '', duration = 600) {
-        const start = 0;
-        const startTime = performance.now();
-        const isFloat = String(end).includes('.');
-
-        function update(now) {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            const current = start + (end - start) * eased;
-
-            if (isFloat) {
-                el.textContent = current.toFixed(2) + suffix;
-            } else {
-                el.textContent = Math.round(current) + suffix;
-            }
-
-            if (progress < 1) requestAnimationFrame(update);
-        }
-
-        requestAnimationFrame(update);
-    }
-
-    // ── Get addresses from config ──
-    function getAddresses() {
-        const numPages = parseInt(document.getElementById('numPages').value);
-        const pageSize = parseInt(document.getElementById('pageSize').value);
-        const numAccesses = parseInt(document.getElementById('numAccesses').value);
-
-        const addrText = document.getElementById('addresses').value.trim();
-        if (addrText) {
-            return addrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    _evict() {
+        if (this.policy === 'FIFO') {
+            const victim = this.order.shift();
+            this.cache.delete(victim);
         } else {
-            const maxAddr = numPages * pageSize - 1;
-            return Array.from({ length: numAccesses }, () => Math.floor(Math.random() * (maxAddr + 1)));
+            const first = this.cache.keys().next().value;
+            this.cache.delete(first);
         }
     }
 
-    // ── Run Simulation ──
-    function runSimulation() {
-        const numPages = parseInt(document.getElementById('numPages').value);
-        const pageSize = parseInt(document.getElementById('pageSize').value);
-        const tlbSize = parseInt(document.getElementById('tlbSize').value);
-        const policy = document.getElementById('policy').value;
-        const addresses = getAddresses();
+    snapshot() {
+        const s = {};
+        for (const [k, v] of this.cache) s[k] = v;
+        return s;
+    }
+}
 
-        const config = { numPages, pageSize, tlbSize, policy, addresses };
-        const sim = simulate(config);
+function simulate(config) {
+    const pt = new PageTable(config.numPages);
+    const tlb = new TLB(config.tlbSize, config.policy);
+    const results = [];
+    let hits = 0, misses = 0;
 
-        // Animated summary
-        const totalEl = document.getElementById('totalAccesses');
-        const hitsEl = document.getElementById('totalHits');
-        const missesEl = document.getElementById('totalMisses');
-        const hitRateEl = document.getElementById('hitRate');
-        const ematEl = document.getElementById('ematValue');
-        const speedupEl = document.getElementById('speedup');
+    for (const addr of config.addresses) {
+        const page = Math.floor(addr / config.pageSize);
+        const offset = addr % config.pageSize;
+        let frame = tlb.lookup(page);
+        let hit;
 
-        animateValue(totalEl, sim.total, '');
-        animateValue(hitsEl, sim.hits, '');
-        animateValue(missesEl, sim.misses, '');
-        animateValue(hitRateEl, parseFloat((sim.hitRate * 100).toFixed(1)), '%');
-        animateValue(ematEl, parseFloat(sim.emat.toFixed(2)), '');
-
-        const spd = sim.emat > 0 ? MEMORY_ACCESS_TIME / sim.emat : 0;
-        animateValue(speedupEl, parseFloat(spd.toFixed(2)), '×');
-
-        // Trace table
-        const tbody = document.getElementById('traceBody');
-        tbody.innerHTML = '';
-        for (let i = 0; i < sim.results.length; i++) {
-            const r = sim.results[i];
-            const tlbStr = Object.entries(r.tlb).map(([k, v]) => `${k}→${v}`).join(', ') || 'empty';
-            const tag = r.hit
-                ? '<span class="tag tag-hit">HIT</span>'
-                : '<span class="tag tag-miss">MISS</span>';
-            const row = document.createElement('tr');
-            row.style.animation = `fadeSlideIn 0.3s ${i * 0.03}s both`;
-            row.innerHTML = `
-                <td>${i + 1}</td>
-                <td>${r.addr}</td>
-                <td>${r.page}</td>
-                <td>${r.offset}</td>
-                <td>${r.frame}</td>
-                <td>${tag}</td>
-                <td class="tlb-state">{ ${tlbStr} }</td>
-            `;
-            tbody.appendChild(row);
+        if (frame !== null) {
+            hit = true;
+            hits++;
+        } else {
+            hit = false;
+            misses++;
+            frame = pt.lookup(page);
+            if (frame !== -1) tlb.insert(page, frame);
         }
 
-        // Charts
-        renderCharts(sim, config);
-
-        document.getElementById('results').classList.add('visible');
-        document.getElementById('footer').style.display = 'block';
-
-        // Smooth scroll to results
-        document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        results.push({ addr, page, offset, frame, hit, tlb: tlb.snapshot() });
     }
 
-    function renderCharts(sim, config) {
-        const chartDefaults = {
-            responsive: true,
-            maintainAspectRatio: false,
+    const total = hits + misses;
+    const hitRate = total ? hits / total : 0;
+    const missRate = total ? misses / total : 0;
+    const emat = (hitRate * TLB_ACCESS_TIME) + (missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME));
+
+    return { results, hits, misses, total, hitRate, missRate, emat };
+}
+
+// ════════════════════════════════════════════
+//  CHART INSTANCES
+// ════════════════════════════════════════════
+
+let chartHR = null, chartEM = null;
+
+// ════════════════════════════════════════════
+//  MAIN ANALYSIS FUNCTION
+// ════════════════════════════════════════════
+
+function getAddresses(numPages, pageSize, numAccesses) {
+    const addrText = document.getElementById('addresses').value.trim();
+    if (addrText) {
+        return addrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    }
+    const maxAddr = numPages * pageSize - 1;
+    return Array.from({ length: numAccesses }, () => Math.floor(Math.random() * (maxAddr + 1)));
+}
+
+function runFullAnalysis() {
+    const numPages  = parseInt(document.getElementById('numPages').value);
+    const pageSize  = parseInt(document.getElementById('pageSize').value);
+    const tlbSize   = parseInt(document.getElementById('tlbSize').value);
+    const numAccesses = parseInt(document.getElementById('numAccesses').value);
+    const policy    = document.getElementById('policy').value;
+
+    const addresses = getAddresses(numPages, pageSize, numAccesses);
+
+    // ── 1. INPUT SUMMARY ──
+    document.getElementById('inputSummaryMetrics').innerHTML = `
+        <div class="metric"><div class="metric-val">${numPages}</div><div class="metric-label">Pages</div></div>
+        <div class="metric"><div class="metric-val">${pageSize}</div><div class="metric-label">Page Size</div></div>
+        <div class="metric"><div class="metric-val">${tlbSize}</div><div class="metric-label">TLB Size</div></div>
+        <div class="metric"><div class="metric-val">${addresses.length}</div><div class="metric-label">Accesses</div></div>
+        <div class="metric"><div class="metric-val">${policy}</div><div class="metric-label">Policy</div></div>
+        <div class="metric"><div class="metric-val">${TLB_ACCESS_TIME} / ${MEMORY_ACCESS_TIME}</div><div class="metric-label">TLB / Mem Time</div></div>
+    `;
+    document.getElementById('addressList').textContent = 'Addresses: [' + addresses.join(', ') + ']';
+
+    // ── 2. PRIMARY SIMULATION ──
+    const config = { numPages, pageSize, tlbSize, policy, addresses };
+    const sim = simulate(config);
+    const speedup = sim.emat > 0 ? (MEMORY_ACCESS_TIME / sim.emat) : 0;
+
+    document.getElementById('resultMetrics').innerHTML = `
+        <div class="metric"><div class="metric-val">${sim.total}</div><div class="metric-label">Total</div></div>
+        <div class="metric"><div class="metric-val val-hit">${sim.hits}</div><div class="metric-label">Hits</div></div>
+        <div class="metric"><div class="metric-val val-miss">${sim.misses}</div><div class="metric-label">Misses</div></div>
+        <div class="metric"><div class="metric-val val-accent">${(sim.hitRate * 100).toFixed(1)}%</div><div class="metric-label">Hit Rate</div></div>
+        <div class="metric"><div class="metric-val">${sim.emat.toFixed(2)}</div><div class="metric-label">EMAT</div></div>
+        <div class="metric"><div class="metric-val val-accent">${speedup.toFixed(2)}×</div><div class="metric-label">Speedup</div></div>
+    `;
+
+    // ── 3. MULTI-SIZE COMPARISON (TLB = 2, 4, 8) ──
+    const compSizes = [2, 4, 8];
+    const compResults = [];
+
+    for (const sz of compSizes) {
+        const r = simulate({ numPages, pageSize, tlbSize: sz, policy, addresses });
+        compResults.push({ size: sz, ...r });
+    }
+
+    // Find best EMAT
+    let bestEmat = Infinity;
+    compResults.forEach(r => { if (r.emat < bestEmat) bestEmat = r.emat; });
+
+    const compBody = document.getElementById('comparisonBody');
+    compBody.innerHTML = '';
+    compResults.forEach(r => {
+        const isBest = r.emat === bestEmat;
+        compBody.innerHTML += `<tr class="${isBest ? 'best-row' : ''}">
+            <td>${r.size}</td>
+            <td>${policy}</td>
+            <td class="val-hit">${r.hits}</td>
+            <td class="val-miss">${r.misses}</td>
+            <td>${(r.hitRate * 100).toFixed(1)}%</td>
+            <td>${(r.missRate * 100).toFixed(1)}%</td>
+            <td>${r.emat.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    // Observations
+    const obsBox = document.getElementById('comparisonObs');
+    const best = compResults.reduce((a, b) => a.emat < b.emat ? a : b);
+    const worst = compResults.reduce((a, b) => a.emat > b.emat ? a : b);
+    const sizeHelps = compResults.every((r, i) => i === 0 || r.hitRate >= compResults[i - 1].hitRate);
+
+    obsBox.innerHTML = `
+        <p><strong>Best configuration:</strong> TLB size = ${best.size} with EMAT = ${best.emat.toFixed(2)} and hit rate = ${(best.hitRate * 100).toFixed(1)}%</p>
+        <p><strong>Worst configuration:</strong> TLB size = ${worst.size} with EMAT = ${worst.emat.toFixed(2)}</p>
+        <p>${sizeHelps
+            ? '<strong>Observation:</strong> Increasing TLB size consistently improves hit rate for this access pattern.'
+            : '<strong>Observation:</strong> Increasing TLB size does not always improve hit rate — it depends on the access pattern.'}</p>
+    `;
+
+    // ── 4. BASELINE COMPARISON ──
+    const ematNoTlb = MEMORY_ACCESS_TIME;
+    const baseBody = document.getElementById('baselineBody');
+    baseBody.innerHTML = `
+        <tr>
+            <td>Without TLB (direct memory)</td>
+            <td>${ematNoTlb.toFixed(2)}</td>
+            <td>1.00×</td>
+        </tr>
+        <tr class="best-row">
+            <td>With TLB (size=${best.size}, ${policy})</td>
+            <td>${best.emat.toFixed(2)}</td>
+            <td class="val-accent">${(ematNoTlb / best.emat).toFixed(2)}×</td>
+        </tr>
+    `;
+
+    // ── 5. CHARTS ──
+    renderCharts(compSizes, compResults, numPages, pageSize, policy, addresses);
+
+    // ── 6. STEP-BY-STEP TRACE ──
+    const traceBody = document.getElementById('traceBody');
+    traceBody.innerHTML = '';
+    sim.results.forEach((r, i) => {
+        const tlbStr = Object.entries(r.tlb).map(([k, v]) => `${k}→${v}`).join(', ') || 'empty';
+        traceBody.innerHTML += `<tr>
+            <td>${i + 1}</td>
+            <td>${r.addr}</td>
+            <td>${r.page}</td>
+            <td>${r.offset}</td>
+            <td>${r.frame}</td>
+            <td>${r.hit ? '<span class="tag tag-hit">HIT</span>' : '<span class="tag tag-miss">MISS</span>'}</td>
+            <td style="color:var(--text-muted); font-size:0.78rem">{ ${tlbStr} }</td>
+        </tr>`;
+    });
+
+    // ── 7. ANALYSIS / INTERPRETATION ──
+    const uniquePages = new Set(addresses.map(a => Math.floor(a / pageSize))).size;
+    const analysisList = document.getElementById('analysisList');
+
+    // Run both policies for comparison insight
+    const fifoSim = simulate({ numPages, pageSize, tlbSize, policy: 'FIFO', addresses });
+    const lruSim = simulate({ numPages, pageSize, tlbSize, policy: 'LRU', addresses });
+    let policyInsight;
+    if (fifoSim.hitRate > lruSim.hitRate) {
+        policyInsight = `For this access pattern, <strong>FIFO outperforms LRU</strong> (FIFO hit rate: ${(fifoSim.hitRate*100).toFixed(1)}%, LRU: ${(lruSim.hitRate*100).toFixed(1)}%). This can happen when frequently accessed pages were loaded early and remain in the FIFO queue.`;
+    } else if (lruSim.hitRate > fifoSim.hitRate) {
+        policyInsight = `For this access pattern, <strong>LRU outperforms FIFO</strong> (LRU hit rate: ${(lruSim.hitRate*100).toFixed(1)}%, FIFO: ${(fifoSim.hitRate*100).toFixed(1)}%). LRU keeps recently accessed pages in the cache, which benefits patterns with temporal locality.`;
+    } else {
+        policyInsight = `Both <strong>FIFO and LRU produce the same hit rate</strong> (${(fifoSim.hitRate*100).toFixed(1)}%) for this access pattern. This often happens with small TLB sizes or uniform access patterns.`;
+    }
+
+    analysisList.innerHTML = `
+        <li>
+            <span class="analysis-key">TLB Size Effect</span>
+            A larger TLB can store more page-to-frame mappings simultaneously. With ${uniquePages} unique pages in this access sequence, a TLB of size ${best.size} achieved the best hit rate of <strong>${(best.hitRate*100).toFixed(1)}%</strong>. When the TLB is too small to hold the working set, evictions cause repeated misses on the same pages.
+        </li>
+        <li>
+            <span class="analysis-key">Hit Rate → EMAT</span>
+            EMAT = (Hit Rate × ${TLB_ACCESS_TIME}) + (Miss Rate × ${TLB_ACCESS_TIME + MEMORY_ACCESS_TIME}). A higher hit rate means more accesses are served in <strong>${TLB_ACCESS_TIME} unit</strong> (TLB) instead of <strong>${TLB_ACCESS_TIME + MEMORY_ACCESS_TIME} units</strong> (TLB + memory). The best configuration reduced EMAT from ${ematNoTlb.toFixed(2)} to <strong>${best.emat.toFixed(2)}</strong>, a <strong>${(ematNoTlb / best.emat).toFixed(2)}× speedup</strong>.
+        </li>
+        <li>
+            <span class="analysis-key">Replacement Policy</span>
+            ${policyInsight}
+        </li>
+        <li>
+            <span class="analysis-key">Working Set</span>
+            This address sequence accesses <strong>${uniquePages} unique pages</strong>. When TLB size ≥ working set size, the hit rate approaches 100% (after initial compulsory misses). With TLB size < working set, capacity misses occur as pages compete for limited TLB entries.
+        </li>
+        <li>
+            <span class="analysis-key">Compulsory Misses</span>
+            The first access to any page is always a miss (cold start). With ${uniquePages} unique pages, there are at least <strong>${uniquePages} compulsory misses</strong> regardless of TLB size or policy. The remaining ${addresses.length - uniquePages} accesses are potential hits depending on TLB capacity and replacement strategy.
+        </li>
+    `;
+
+    // Show output
+    document.getElementById('output').classList.add('visible');
+    document.getElementById('panelSummary').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ════════════════════════════════════════════
+//  CHARTS
+// ════════════════════════════════════════════
+
+function renderCharts(compSizes, compResults, numPages, pageSize, policy, addresses) {
+    // Sweep all sizes 1..numPages for smooth charts
+    const allSizes = [], allHitRates = [], allEmats = [];
+    for (let sz = 1; sz <= numPages; sz++) {
+        const r = simulate({ numPages, pageSize, tlbSize: sz, policy, addresses });
+        allSizes.push(sz);
+        allHitRates.push((r.hitRate * 100).toFixed(1));
+        allEmats.push(r.emat.toFixed(2));
+    }
+
+    const baseOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                title: { display: true, text: 'TLB Size', color: '#50505e', font: { family: 'Inter', size: 11 } },
+                ticks: { color: '#50505e', font: { family: 'Inter', size: 10 } },
+                grid: { color: 'rgba(255,255,255,0.03)' },
+                border: { color: 'rgba(255,255,255,0.06)' },
+            },
+            y: {
+                ticks: { color: '#50505e', font: { family: 'Inter', size: 10 } },
+                grid: { color: 'rgba(255,255,255,0.03)' },
+                border: { color: 'rgba(255,255,255,0.06)' },
+            },
+        },
+    };
+
+    const tooltipStyle = {
+        backgroundColor: '#1a1a22',
+        borderColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        titleColor: '#e0e0e0',
+        bodyColor: '#9393a8',
+        titleFont: { family: 'Inter', weight: '600' },
+        bodyFont: { family: 'JetBrains Mono' },
+        cornerRadius: 6,
+        padding: 10,
+    };
+
+    // Hit Rate chart
+    if (chartHR) chartHR.destroy();
+    chartHR = new Chart(document.getElementById('chartHitRate'), {
+        type: 'bar',
+        data: {
+            labels: allSizes,
+            datasets: [{
+                data: allHitRates,
+                backgroundColor: allHitRates.map((_, i) => {
+                    const t = i / (allSizes.length - 1 || 1);
+                    return `rgba(${Math.round(108 + (0-108)*t)}, ${Math.round(92 + (206-92)*t)}, ${Math.round(231 + (201-231)*t)}, 0.65)`;
+                }),
+                borderRadius: 4,
+                borderSkipped: false,
+            }],
+        },
+        options: {
+            ...baseOpts,
             plugins: {
                 legend: { display: false },
+                title: { display: true, text: 'TLB Size vs Hit Rate (%)', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
+                tooltip: tooltipStyle,
             },
-            scales: {
-                x: {
-                    ticks: { color: '#5e5e73', font: { family: 'Inter', size: 11 } },
-                    grid: { color: 'rgba(255,255,255,0.03)' },
-                    border: { color: 'rgba(255,255,255,0.06)' },
-                },
-                y: {
-                    ticks: { color: '#5e5e73', font: { family: 'Inter', size: 11 } },
-                    grid: { color: 'rgba(255,255,255,0.03)' },
-                    border: { color: 'rgba(255,255,255,0.06)' },
-                },
+            scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, min: 0, max: 110, title: { display: true, text: 'Hit Rate (%)', color: '#50505e', font: { family: 'Inter', size: 11 } } } },
+        },
+    });
+
+    // EMAT chart
+    if (chartEM) chartEM.destroy();
+    chartEM = new Chart(document.getElementById('chartEmat'), {
+        type: 'line',
+        data: {
+            labels: allSizes,
+            datasets: [{
+                data: allEmats,
+                borderColor: '#fd79a8',
+                backgroundColor: 'rgba(253,121,168,0.05)',
+                borderWidth: 2,
+                pointBackgroundColor: '#fd79a8',
+                pointBorderColor: '#c0456a',
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: true,
+                tension: 0.3,
+            }],
+        },
+        options: {
+            ...baseOpts,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'TLB Size vs EMAT (time units)', color: '#7a7a90', font: { family: 'Inter', size: 12, weight: '600' }, padding: { bottom: 12 } },
+                tooltip: tooltipStyle,
             },
-        };
+            scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, title: { display: true, text: 'EMAT', color: '#50505e', font: { family: 'Inter', size: 11 } } } },
+        },
+    });
+}
 
-        // Cumulative hit rate
-        const cumLabels = [], cumData = [];
-        let h = 0;
-        for (let i = 0; i < sim.results.length; i++) {
-            if (sim.results[i].hit) h++;
-            cumLabels.push(i + 1);
-            cumData.push(((h / (i + 1)) * 100).toFixed(1));
-        }
+// ════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════
 
-        if (chartCum) chartCum.destroy();
-        chartCum = new Chart(document.getElementById('chartCumulative'), {
-            type: 'line',
-            data: {
-                labels: cumLabels,
-                datasets: [{
-                    data: cumData,
-                    borderColor: '#6c5ce7',
-                    backgroundColor: 'rgba(108, 92, 231, 0.06)',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#a29bfe',
-                    pointBorderColor: '#6c5ce7',
-                    pointBorderWidth: 1.5,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    fill: true,
-                    tension: 0.3,
-                }]
-            },
-            options: {
-                ...chartDefaults,
-                plugins: {
-                    ...chartDefaults.plugins,
-                    title: {
-                        display: true,
-                        text: 'Cumulative Hit Rate (%)',
-                        color: '#9393a8',
-                        font: { family: 'Inter', size: 13, weight: '600' },
-                        padding: { bottom: 16 },
-                    },
-                    tooltip: {
-                        backgroundColor: '#1a1a25',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderWidth: 1,
-                        titleColor: '#e8e8ed',
-                        bodyColor: '#9393a8',
-                        titleFont: { family: 'Inter', weight: '600' },
-                        bodyFont: { family: 'JetBrains Mono' },
-                        cornerRadius: 8,
-                        padding: 12,
-                    },
-                },
-                scales: {
-                    ...chartDefaults.scales,
-                    y: { ...chartDefaults.scales.y, min: 0, max: 105 },
-                },
-            }
-        });
+function toggleTrace() {
+    const content = document.getElementById('traceContent');
+    content.style.display = document.getElementById('traceToggle').checked ? 'block' : 'none';
+}
 
-        // TLB size vs hit rate
-        const sizes = [], rates = [];
-        for (let sz = 1; sz <= config.numPages; sz++) {
-            const s = simulate({ ...config, tlbSize: sz });
-            sizes.push(sz);
-            rates.push((s.hitRate * 100).toFixed(1));
-        }
+function loadExample() {
+    document.getElementById('numPages').value = 10;
+    document.getElementById('pageSize').value = 10;
+    document.getElementById('tlbSize').value = 3;
+    document.getElementById('numAccesses').value = 20;
+    document.getElementById('policy').value = 'FIFO';
+    document.getElementById('addresses').value = '10, 22, 15, 10, 45, 22, 55, 10, 22, 78, 15, 45, 90, 22, 10, 55, 78, 45, 10, 22';
+}
 
-        if (chartBar) chartBar.destroy();
-        chartBar = new Chart(document.getElementById('chartTlbSize'), {
-            type: 'bar',
-            data: {
-                labels: sizes,
-                datasets: [{
-                    data: rates,
-                    backgroundColor: rates.map((_, i) => {
-                        const t = i / (sizes.length - 1 || 1);
-                        return `rgba(${Math.round(108 + (0 - 108) * t)}, ${Math.round(92 + (206 - 92) * t)}, ${Math.round(231 + (201 - 231) * t)}, 0.7)`;
-                    }),
-                    borderColor: 'transparent',
-                    borderWidth: 0,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }]
-            },
-            options: {
-                ...chartDefaults,
-                plugins: {
-                    ...chartDefaults.plugins,
-                    title: {
-                        display: true,
-                        text: 'TLB Size vs Hit Rate (%)',
-                        color: '#9393a8',
-                        font: { family: 'Inter', size: 13, weight: '600' },
-                        padding: { bottom: 16 },
-                    },
-                    tooltip: {
-                        backgroundColor: '#1a1a25',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderWidth: 1,
-                        titleColor: '#e8e8ed',
-                        bodyColor: '#9393a8',
-                        titleFont: { family: 'Inter', weight: '600' },
-                        bodyFont: { family: 'JetBrains Mono' },
-                        cornerRadius: 8,
-                        padding: 12,
-                    },
-                },
-                scales: {
-                    ...chartDefaults.scales,
-                    y: { ...chartDefaults.scales.y, min: 0, max: 110 },
-                },
-            }
-        });
-    }
-
-    // ── FIFO vs LRU Comparison ──
-    function runComparison() {
-        const numPages = parseInt(document.getElementById('numPages').value);
-        const pageSize = parseInt(document.getElementById('pageSize').value);
-        const tlbSize = parseInt(document.getElementById('tlbSize').value);
-        const addresses = getAddresses();
-
-        const fifo = simulate({ numPages, pageSize, tlbSize, policy: 'FIFO', addresses });
-        const lru = simulate({ numPages, pageSize, tlbSize, policy: 'LRU', addresses });
-
-        function buildStats(sim) {
-            const spd = sim.emat > 0 ? (MEMORY_ACCESS_TIME / sim.emat).toFixed(2) : '∞';
-            return `
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">Total Accesses</span>
-                    <span class="comparison-stat-value">${sim.total}</span>
-                </div>
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">Hits</span>
-                    <span class="comparison-stat-value" style="color:var(--hit-color)">${sim.hits}</span>
-                </div>
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">Misses</span>
-                    <span class="comparison-stat-value" style="color:var(--miss-color)">${sim.misses}</span>
-                </div>
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">Hit Rate</span>
-                    <span class="comparison-stat-value">${(sim.hitRate * 100).toFixed(1)}%</span>
-                </div>
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">EMAT</span>
-                    <span class="comparison-stat-value">${sim.emat.toFixed(2)}</span>
-                </div>
-                <div class="comparison-stat">
-                    <span class="comparison-stat-label">Speedup</span>
-                    <span class="comparison-stat-value">${spd}×</span>
-                </div>
-            `;
-        }
-
-        document.getElementById('fifoStats').innerHTML = buildStats(fifo);
-        document.getElementById('lruStats').innerHTML = buildStats(lru);
-
-        // Winner badges
-        const fifoCard = document.getElementById('fifoCard');
-        const lruCard = document.getElementById('lruCard');
-
-        // Remove old badges
-        fifoCard.querySelectorAll('.winner-badge').forEach(e => e.remove());
-        lruCard.querySelectorAll('.winner-badge').forEach(e => e.remove());
-
-        if (fifo.hitRate > lru.hitRate) {
-            fifoCard.innerHTML += '<div class="winner-badge">★ Better Performance</div>';
-            fifoCard.style.borderColor = 'var(--hit-border)';
-            lruCard.style.borderColor = 'var(--border-subtle)';
-        } else if (lru.hitRate > fifo.hitRate) {
-            lruCard.innerHTML += '<div class="winner-badge">★ Better Performance</div>';
-            lruCard.style.borderColor = 'var(--hit-border)';
-            fifoCard.style.borderColor = 'var(--border-subtle)';
-        } else {
-            fifoCard.style.borderColor = 'var(--border-subtle)';
-            lruCard.style.borderColor = 'var(--border-subtle)';
-        }
-
-        // Comparison chart — TLB size sweep for both policies
-        const compSizes = [];
-        const fifoRates = [];
-        const lruRates = [];
-
-        for (let sz = 1; sz <= numPages; sz++) {
-            compSizes.push(sz);
-            const f = simulate({ numPages, pageSize, tlbSize: sz, policy: 'FIFO', addresses });
-            const l = simulate({ numPages, pageSize, tlbSize: sz, policy: 'LRU', addresses });
-            fifoRates.push((f.hitRate * 100).toFixed(1));
-            lruRates.push((l.hitRate * 100).toFixed(1));
-        }
-
-        if (chartComp) chartComp.destroy();
-        chartComp = new Chart(document.getElementById('chartComparison'), {
-            type: 'line',
-            data: {
-                labels: compSizes,
-                datasets: [
-                    {
-                        label: 'FIFO',
-                        data: fifoRates,
-                        borderColor: '#a29bfe',
-                        backgroundColor: 'rgba(162, 155, 254, 0.06)',
-                        borderWidth: 2.5,
-                        pointBackgroundColor: '#a29bfe',
-                        pointBorderColor: '#6c5ce7',
-                        pointBorderWidth: 1.5,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: true,
-                        tension: 0.3,
-                    },
-                    {
-                        label: 'LRU',
-                        data: lruRates,
-                        borderColor: '#00cec9',
-                        backgroundColor: 'rgba(0, 206, 201, 0.06)',
-                        borderWidth: 2.5,
-                        pointBackgroundColor: '#00cec9',
-                        pointBorderColor: '#00a09c',
-                        pointBorderWidth: 1.5,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: true,
-                        tension: 0.3,
-                    },
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#9393a8',
-                            font: { family: 'Inter', size: 12, weight: '500' },
-                            usePointStyle: true,
-                            pointStyle: 'circle',
-                            padding: 20,
-                        },
-                    },
-                    title: {
-                        display: true,
-                        text: 'TLB Size vs Hit Rate — FIFO vs LRU',
-                        color: '#9393a8',
-                        font: { family: 'Inter', size: 13, weight: '600' },
-                        padding: { bottom: 8 },
-                    },
-                    tooltip: {
-                        backgroundColor: '#1a1a25',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        borderWidth: 1,
-                        titleColor: '#e8e8ed',
-                        bodyColor: '#9393a8',
-                        titleFont: { family: 'Inter', weight: '600' },
-                        bodyFont: { family: 'JetBrains Mono' },
-                        cornerRadius: 8,
-                        padding: 12,
-                    },
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'TLB Size',
-                            color: '#5e5e73',
-                            font: { family: 'Inter', size: 11, weight: '500' },
-                        },
-                        ticks: { color: '#5e5e73', font: { family: 'Inter', size: 11 } },
-                        grid: { color: 'rgba(255,255,255,0.03)' },
-                        border: { color: 'rgba(255,255,255,0.06)' },
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Hit Rate (%)',
-                            color: '#5e5e73',
-                            font: { family: 'Inter', size: 11, weight: '500' },
-                        },
-                        min: 0,
-                        max: 105,
-                        ticks: { color: '#5e5e73', font: { family: 'Inter', size: 11 } },
-                        grid: { color: 'rgba(255,255,255,0.03)' },
-                        border: { color: 'rgba(255,255,255,0.06)' },
-                    },
-                },
-            }
-        });
-
-        document.getElementById('comparisonSection').classList.add('visible');
-        document.getElementById('footer').style.display = 'block';
-
-        document.getElementById('comparisonSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    function loadExample() {
-        document.getElementById('numPages').value = 10;
-        document.getElementById('pageSize').value = 10;
-        document.getElementById('tlbSize').value = 3;
-        document.getElementById('numAccesses').value = 6;
-        document.getElementById('policy').value = 'FIFO';
-        document.getElementById('addresses').value = '10, 22, 15, 10, 45, 22';
-
-        // Brief visual feedback
-        const btn = event.target;
-        btn.textContent = '✓ Loaded';
-        btn.style.color = 'var(--hit-color)';
-        setTimeout(() => {
-            btn.textContent = '◇ Load Example';
-            btn.style.color = '';
-        }, 1000);
-    }
-
-    function clearResults() {
-        document.getElementById('results').classList.remove('visible');
-        document.getElementById('comparisonSection').classList.remove('visible');
-        document.getElementById('traceBody').innerHTML = '';
-        document.getElementById('footer').style.display = 'none';
-        if (chartCum) { chartCum.destroy(); chartCum = null; }
-        if (chartBar) { chartBar.destroy(); chartBar = null; }
-        if (chartComp) { chartComp.destroy(); chartComp = null; }
-
-        // Reset card borders
-        document.getElementById('fifoCard').style.borderColor = '';
-        document.getElementById('lruCard').style.borderColor = '';
-    }
-    </script>
+function clearAll() {
+    document.getElementById('output').classList.remove('visible');
+    if (chartHR) { chartHR.destroy(); chartHR = null; }
+    if (chartEM) { chartEM.destroy(); chartEM = null; }
+}
+</script>
 </body>
 </html>
