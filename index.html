@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Simulate TLB behavior and analyze memory access performance with hit rate, miss rate, and EMAT calculations.">
+    <title>TLB Performance Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #111;
+            color: #ccc;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 36px;
+        }
+
+        /* ── Form ── */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.75rem;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .field input, .field select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #ddd;
+            font-size: 0.9rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .field input:focus, .field select:focus {
+            border-color: #555;
+        }
+
+        .addr-field {
+            margin-bottom: 20px;
+        }
+
+        .addr-field input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #ddd;
+            font-size: 0.9rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .addr-field input:focus { border-color: #555; }
+
+        .addr-field label {
+            display: block;
+            font-size: 0.75rem;
+            color: #777;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .hint {
+            font-size: 0.72rem;
+            color: #555;
+            margin-top: 4px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 36px;
+        }
+
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:active { transform: scale(0.97); }
+
+        .btn-run {
+            background: #e0e0e0;
+            color: #111;
+        }
+
+        .btn-run:hover { background: #fff; }
+
+        .btn-example {
+            background: #2a2a2a;
+            color: #aaa;
+        }
+
+        .btn-example:hover { background: #333; color: #ccc; }
+
+        .btn-clear {
+            background: transparent;
+            color: #555;
+            border: 1px solid #2a2a2a;
+        }
+
+        .btn-clear:hover { border-color: #444; color: #888; }
+
+        /* ── Results ── */
+        .results { display: none; }
+
+        .results.visible { display: block; }
+
+        .section-title {
+            font-size: 0.75rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1e1e1e;
+        }
+
+        /* ── Summary Cards ── */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .card-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #e0e0e0;
+            font-family: 'Consolas', monospace;
+        }
+
+        .card-value.hit { color: #8fbf8f; }
+        .card-value.miss { color: #cc7777; }
+
+        .card-label {
+            font-size: 0.7rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        /* ── Trace Table ── */
+        .trace-wrap {
+            margin-bottom: 32px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+
+        th {
+            text-align: left;
+            padding: 8px 10px;
+            color: #666;
+            font-weight: 500;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #222;
+        }
+
+        td {
+            padding: 7px 10px;
+            border-bottom: 1px solid #1a1a1a;
+            color: #bbb;
+        }
+
+        tr:hover td { background: #151515; }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .tag-hit {
+            background: rgba(143, 191, 143, 0.15);
+            color: #8fbf8f;
+        }
+
+        .tag-miss {
+            background: rgba(204, 119, 119, 0.15);
+            color: #cc7777;
+        }
+
+        .tlb-state {
+            color: #555;
+            font-size: 0.78rem;
+        }
+
+        /* ── Charts ── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .chart-box {
+            background: #1a1a1a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .chart-box canvas {
+            width: 100% !important;
+            height: 260px !important;
+        }
+
+        @media (max-width: 700px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .config-grid { grid-template-columns: 1fr 1fr; }
+            .summary-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TLB Performance Analyzer</h1>
+        <p class="subtitle">Simulate Translation Lookaside Buffer behavior and analyze memory access performance</p>
+
+        <!-- Configuration -->
+        <div class="config-grid">
+            <div class="field">
+                <label for="numPages">Pages</label>
+                <input type="number" id="numPages" value="10" min="1">
+            </div>
+            <div class="field">
+                <label for="pageSize">Page Size</label>
+                <input type="number" id="pageSize" value="10" min="1">
+            </div>
+            <div class="field">
+                <label for="tlbSize">TLB Size</label>
+                <input type="number" id="tlbSize" value="3" min="1">
+            </div>
+            <div class="field">
+                <label for="numAccesses">Accesses</label>
+                <input type="number" id="numAccesses" value="20" min="1">
+            </div>
+            <div class="field">
+                <label for="policy">Policy</label>
+                <select id="policy">
+                    <option value="FIFO">FIFO</option>
+                    <option value="LRU">LRU</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="addr-field">
+            <label for="addresses">Addresses</label>
+            <input type="text" id="addresses" placeholder="e.g. 10, 22, 15, 10, 45, 22">
+            <p class="hint">Comma-separated integers. Leave blank to auto-generate random addresses.</p>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-run" id="btnRun" onclick="runSimulation()">Run Simulation</button>
+            <button class="btn-example" onclick="loadExample()">Load Example</button>
+            <button class="btn-clear" onclick="clearResults()">Clear</button>
+        </div>
+
+        <!-- Results -->
+        <div class="results" id="results">
+
+            <p class="section-title">Summary</p>
+            <div class="summary-grid">
+                <div class="card">
+                    <div class="card-value" id="totalAccesses">-</div>
+                    <div class="card-label">Total</div>
+                </div>
+                <div class="card">
+                    <div class="card-value hit" id="totalHits">-</div>
+                    <div class="card-label">Hits</div>
+                </div>
+                <div class="card">
+                    <div class="card-value miss" id="totalMisses">-</div>
+                    <div class="card-label">Misses</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" id="hitRate">-</div>
+                    <div class="card-label">Hit Rate</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" id="ematValue">-</div>
+                    <div class="card-label">EMAT</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" id="speedup">-</div>
+                    <div class="card-label">Speedup</div>
+                </div>
+            </div>
+
+            <p class="section-title">Charts</p>
+            <div class="charts-grid">
+                <div class="chart-box">
+                    <canvas id="chartCumulative"></canvas>
+                </div>
+                <div class="chart-box">
+                    <canvas id="chartTlbSize"></canvas>
+                </div>
+            </div>
+
+            <p class="section-title">Step-by-Step Trace</p>
+            <div class="trace-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Address</th>
+                            <th>Page</th>
+                            <th>Offset</th>
+                            <th>Frame</th>
+                            <th>Result</th>
+                            <th>TLB State</th>
+                        </tr>
+                    </thead>
+                    <tbody id="traceBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ── TLB Simulation Engine ──
+
+    const TLB_ACCESS_TIME = 1;
+    const MEMORY_ACCESS_TIME = 10;
+
+    class PageTable {
+        constructor(numPages) {
+            this.table = {};
+            for (let i = 0; i < numPages; i++) this.table[i] = i;
+        }
+        lookup(page) { return this.table[page] ?? -1; }
+    }
+
+    class TLB {
+        constructor(size, policy) {
+            this.size = size;
+            this.policy = policy;
+            this.cache = new Map();
+            this.order = [];
+        }
+
+        lookup(page) {
+            if (this.cache.has(page)) {
+                if (this.policy === 'LRU') {
+                    this.cache.delete(page);
+                    const frame = this._getFrame(page);
+                    this.cache.set(page, frame);
+                }
+                return this.cache.get(page);
+            }
+            return null;
+        }
+
+        _getFrame(page) {
+            for (const [k, v] of this.cache) if (k === page) return v;
+            return null;
+        }
+
+        insert(page, frame) {
+            if (this.cache.has(page)) {
+                this.cache.delete(page);
+                this.cache.set(page, frame);
+                return;
+            }
+            if (this.cache.size >= this.size) this._evict();
+            this.cache.set(page, frame);
+            if (this.policy === 'FIFO') this.order.push(page);
+        }
+
+        _evict() {
+            if (this.policy === 'FIFO') {
+                const victim = this.order.shift();
+                this.cache.delete(victim);
+            } else {
+                const first = this.cache.keys().next().value;
+                this.cache.delete(first);
+            }
+        }
+
+        snapshot() {
+            const s = {};
+            for (const [k, v] of this.cache) s[k] = v;
+            return s;
+        }
+
+        reset() {
+            this.cache.clear();
+            this.order = [];
+        }
+    }
+
+    function simulate(config) {
+        const pt = new PageTable(config.numPages);
+        const tlb = new TLB(config.tlbSize, config.policy);
+        const results = [];
+        let hits = 0, misses = 0;
+
+        for (const addr of config.addresses) {
+            const page = Math.floor(addr / config.pageSize);
+            const offset = addr % config.pageSize;
+            let frame = tlb.lookup(page);
+            let hit;
+
+            if (frame !== null) {
+                hit = true;
+                hits++;
+            } else {
+                hit = false;
+                misses++;
+                frame = pt.lookup(page);
+                if (frame !== -1) tlb.insert(page, frame);
+            }
+
+            results.push({ addr, page, offset, frame, hit, tlb: tlb.snapshot() });
+        }
+
+        const total = hits + misses;
+        const hitRate = total ? hits / total : 0;
+        const missRate = total ? misses / total : 0;
+        const emat = (hitRate * TLB_ACCESS_TIME) + (missRate * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME));
+
+        return { results, hits, misses, total, hitRate, missRate, emat };
+    }
+
+    // ── Chart instances ──
+    let chartCum = null, chartBar = null;
+
+    // ── Run ──
+    function runSimulation() {
+        const numPages = parseInt(document.getElementById('numPages').value);
+        const pageSize = parseInt(document.getElementById('pageSize').value);
+        const tlbSize = parseInt(document.getElementById('tlbSize').value);
+        const numAccesses = parseInt(document.getElementById('numAccesses').value);
+        const policy = document.getElementById('policy').value;
+
+        const addrText = document.getElementById('addresses').value.trim();
+        let addresses;
+        if (addrText) {
+            addresses = addrText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        } else {
+            const maxAddr = numPages * pageSize - 1;
+            addresses = Array.from({ length: numAccesses }, () => Math.floor(Math.random() * (maxAddr + 1)));
+        }
+
+        const config = { numPages, pageSize, tlbSize, policy, addresses };
+        const sim = simulate(config);
+
+        // Summary
+        document.getElementById('totalAccesses').textContent = sim.total;
+        document.getElementById('totalHits').textContent = sim.hits;
+        document.getElementById('totalMisses').textContent = sim.misses;
+        document.getElementById('hitRate').textContent = (sim.hitRate * 100).toFixed(1) + '%';
+        document.getElementById('ematValue').textContent = sim.emat.toFixed(2);
+        const spd = sim.emat > 0 ? (MEMORY_ACCESS_TIME / sim.emat).toFixed(2) + 'x' : '-';
+        document.getElementById('speedup').textContent = spd;
+
+        // Trace table
+        const tbody = document.getElementById('traceBody');
+        tbody.innerHTML = '';
+        for (let i = 0; i < sim.results.length; i++) {
+            const r = sim.results[i];
+            const tlbStr = Object.entries(r.tlb).map(([k, v]) => `${k}→${v}`).join(', ') || 'empty';
+            const tag = r.hit
+                ? '<span class="tag tag-hit">HIT</span>'
+                : '<span class="tag tag-miss">MISS</span>';
+            tbody.innerHTML += `<tr>
+                <td>${i + 1}</td>
+                <td>${r.addr}</td>
+                <td>${r.page}</td>
+                <td>${r.offset}</td>
+                <td>${r.frame}</td>
+                <td>${tag}</td>
+                <td class="tlb-state">{ ${tlbStr} }</td>
+            </tr>`;
+        }
+
+        // Charts
+        renderCharts(sim, config);
+
+        document.getElementById('results').classList.add('visible');
+    }
+
+    function renderCharts(sim, config) {
+        const chartOpts = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#555', font: { size: 11 } },
+                    grid: { color: '#1e1e1e' },
+                },
+                y: {
+                    ticks: { color: '#555', font: { size: 11 } },
+                    grid: { color: '#1e1e1e' },
+                },
+            },
+        };
+
+        // Cumulative hit rate
+        const cumLabels = [], cumData = [];
+        let h = 0;
+        for (let i = 0; i < sim.results.length; i++) {
+            if (sim.results[i].hit) h++;
+            cumLabels.push(i + 1);
+            cumData.push(((h / (i + 1)) * 100).toFixed(1));
+        }
+
+        if (chartCum) chartCum.destroy();
+        chartCum = new Chart(document.getElementById('chartCumulative'), {
+            type: 'line',
+            data: {
+                labels: cumLabels,
+                datasets: [{
+                    data: cumData,
+                    borderColor: '#888',
+                    backgroundColor: 'rgba(136,136,136,0.08)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#aaa',
+                    pointRadius: 3,
+                    fill: true,
+                    tension: 0.25,
+                }]
+            },
+            options: {
+                ...chartOpts,
+                plugins: {
+                    ...chartOpts.plugins,
+                    title: { display: true, text: 'Cumulative Hit Rate (%)', color: '#777', font: { size: 13, weight: '600' } },
+                },
+                scales: {
+                    ...chartOpts.scales,
+                    y: { ...chartOpts.scales.y, min: 0, max: 105 },
+                },
+            }
+        });
+
+        // TLB size vs hit rate
+        const sizes = [], rates = [];
+        for (let sz = 1; sz <= config.numPages; sz++) {
+            const s = simulate({ ...config, tlbSize: sz });
+            sizes.push(sz);
+            rates.push((s.hitRate * 100).toFixed(1));
+        }
+
+        if (chartBar) chartBar.destroy();
+        chartBar = new Chart(document.getElementById('chartTlbSize'), {
+            type: 'bar',
+            data: {
+                labels: sizes,
+                datasets: [{
+                    data: rates,
+                    backgroundColor: '#444',
+                    borderColor: '#555',
+                    borderWidth: 1,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                ...chartOpts,
+                plugins: {
+                    ...chartOpts.plugins,
+                    title: { display: true, text: 'TLB Size vs Hit Rate (%)', color: '#777', font: { size: 13, weight: '600' } },
+                },
+                scales: {
+                    ...chartOpts.scales,
+                    y: { ...chartOpts.scales.y, min: 0, max: 110 },
+                },
+            }
+        });
+    }
+
+    function loadExample() {
+        document.getElementById('numPages').value = 10;
+        document.getElementById('pageSize').value = 10;
+        document.getElementById('tlbSize').value = 3;
+        document.getElementById('numAccesses').value = 6;
+        document.getElementById('policy').value = 'FIFO';
+        document.getElementById('addresses').value = '10, 22, 15, 10, 45, 22';
+    }
+
+    function clearResults() {
+        document.getElementById('results').classList.remove('visible');
+        document.getElementById('traceBody').innerHTML = '';
+        if (chartCum) { chartCum.destroy(); chartCum = null; }
+        if (chartBar) { chartBar.destroy(); chartBar = null; }
+    }
+    </script>
+</body>
+</html>
