@@ -19,6 +19,21 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+# Ensure UTF-8 output on Windows consoles
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except Exception:
+        pass
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #  Constants
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -279,3 +294,65 @@ def print_summary(sim: Simulator) -> None:
     print(f"  Speedup        : {CYAN}{speedup:.2f}x{RESET}")
     print(THICK_DIVIDER)
     print()
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  Visualization
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+def plot_cumulative_hit_rate(results: list[AccessResult]) -> None:
+    hits_so_far = 0
+    x_vals: list[int] = []
+    y_vals: list[float] = []
+
+    for i, r in enumerate(results, 1):
+        if r.hit:
+            hits_so_far += 1
+        x_vals.append(i)
+        y_vals.append(hits_so_far / i * 100)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(x_vals, y_vals, color="#333333", linewidth=2, marker="o",
+            markersize=5, markerfacecolor="#555555", markeredgecolor="#333333")
+    ax.set_xlabel("Memory Access #", fontsize=12)
+    ax.set_ylabel("Cumulative Hit Rate (%)", fontsize=12)
+    ax.set_title("Cumulative TLB Hit Rate Over Time", fontsize=14, fontweight="bold")
+    ax.set_ylim(-5, 105)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    fig.tight_layout()
+    fig.savefig("cumulative_hit_rate.png", dpi=150)
+    print("  [graph]  Saved:  cumulative_hit_rate.png")
+
+
+def plot_tlb_size_vs_hit_rate(config: SimulationConfig) -> None:
+    sizes = list(range(1, config.num_pages + 1))
+    hit_rates: list[float] = []
+
+    for sz in sizes:
+        cfg = SimulationConfig(
+            num_pages=config.num_pages,
+            page_size=config.page_size,
+            tlb_size=sz,
+            policy=config.policy,
+            addresses=list(config.addresses),
+        )
+        sim = Simulator(cfg)
+        sim.run()
+        hit_rates.append(sim.hit_rate * 100)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    bars = ax.bar(sizes, hit_rates, color="#555555", edgecolor="#333333", linewidth=0.8)
+
+    for bar, rate in zip(bars, hit_rates):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
+                f"{rate:.0f}%", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    ax.set_xlabel("TLB Size (entries)", fontsize=12)
+    ax.set_ylabel("Hit Rate (%)", fontsize=12)
+    ax.set_title("TLB Size vs Hit Rate", fontsize=14, fontweight="bold")
+    ax.set_ylim(0, 115)
+    ax.set_xticks(sizes)
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
+    fig.tight_layout()
+    fig.savefig("tlb_size_vs_hit_rate.png", dpi=150)
+    print("  [graph]  Saved:  tlb_size_vs_hit_rate.png")
