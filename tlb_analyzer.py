@@ -202,3 +202,80 @@ class Simulator:
             ))
 
         return self.results
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  Pretty Printing
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+CYAN = "\033[96m"
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+MAGENTA = "\033[95m"
+
+DIVIDER = f"{DIM}{chr(9472) * 72}{RESET}"
+THICK_DIVIDER = f"{DIM}{chr(9552) * 72}{RESET}"
+
+
+def print_banner() -> None:
+    print(f"""
+{THICK_DIVIDER}
+{BOLD}{CYAN}  {chr(9556)}{chr(9552)*51}{chr(9559)}
+  {chr(9553)}         TLB  PERFORMANCE  ANALYZER                {chr(9553)}
+  {chr(9562)}{chr(9552)*51}{chr(9565)}{RESET}
+{THICK_DIVIDER}
+""")
+
+
+def print_config(cfg: SimulationConfig) -> None:
+    print(f"{BOLD}Configuration{RESET}")
+    print(DIVIDER)
+    print(f"  Pages          : {cfg.num_pages}")
+    print(f"  Page size      : {cfg.page_size}")
+    print(f"  TLB size       : {cfg.tlb_size}")
+    print(f"  Policy         : {cfg.policy.value}")
+    print(f"  Addresses ({len(cfg.addresses)})  : {cfg.addresses}")
+    print(f"  TLB access time: {TLB_ACCESS_TIME} unit(s)")
+    print(f"  Memory access  : {MEMORY_ACCESS_TIME} unit(s)")
+    print(DIVIDER)
+    print()
+
+
+def print_step(idx: int, r: AccessResult) -> None:
+    status = f"{GREEN}HIT{RESET}" if r.hit else f"{RED}MISS{RESET}"
+    tlb_str = ", ".join(f"{p}->{f}" for p, f in r.tlb_snapshot.items()) or "empty"
+    print(
+        f"  {BOLD}[{idx+1:>3}]{RESET}  "
+        f"VA={r.virtual_address:<6}  "
+        f"Page={r.page_number:<4}  "
+        f"Offset={r.offset:<4}  "
+        f"Frame={r.frame_number:<4}  "
+        f"{status:<14}  "
+        f"{DIM}TLB {{ {tlb_str} }}{RESET}"
+    )
+
+
+def print_summary(sim: Simulator) -> None:
+    print()
+    print(THICK_DIVIDER)
+    print(f"{BOLD}{MAGENTA}  RESULTS SUMMARY{RESET}")
+    print(THICK_DIVIDER)
+    print(f"  Total accesses : {sim.total}")
+    print(f"  TLB hits       : {GREEN}{sim.hits}{RESET}")
+    print(f"  TLB misses     : {RED}{sim.misses}{RESET}")
+    print(f"  Hit rate       : {YELLOW}{sim.hit_rate:.2%}{RESET}")
+    print(f"  Miss rate      : {YELLOW}{sim.miss_rate:.2%}{RESET}")
+    print(f"  EMAT           : {CYAN}{sim.emat:.2f} time units{RESET}")
+    print()
+
+    no_tlb_time = MEMORY_ACCESS_TIME
+    speedup = no_tlb_time / sim.emat if sim.emat else float("inf")
+    print(f"  Without TLB    : {no_tlb_time:.2f} time units per access")
+    print(f"  With TLB       : {sim.emat:.2f} time units per access")
+    print(f"  Speedup        : {CYAN}{speedup:.2f}x{RESET}")
+    print(THICK_DIVIDER)
+    print()
