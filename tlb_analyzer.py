@@ -67,3 +67,61 @@ class PageTable:
     def __repr__(self) -> str:
         entries = ", ".join(f"{p}->{f}" for p, f in sorted(self._table.items()))
         return f"PageTable({entries})"
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  TLB
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+class TLB:
+    """Translation Lookaside Buffer with configurable size and replacement policy."""
+
+    def __init__(self, size: int, policy: ReplacementPolicy = ReplacementPolicy.FIFO):
+        self.size = size
+        self.policy = policy
+
+        if policy == ReplacementPolicy.LRU:
+            self._cache: OrderedDict[int, int] = OrderedDict()
+        else:
+            self._cache: dict[int, int] = {}
+            self._order: deque[int] = deque()
+
+    def lookup(self, page_number: int) -> Optional[int]:
+        if page_number in self._cache:
+            if self.policy == ReplacementPolicy.LRU:
+                self._cache.move_to_end(page_number)
+            return self._cache[page_number]
+        return None
+
+    def insert(self, page_number: int, frame_number: int) -> None:
+        if page_number in self._cache:
+            self._cache[page_number] = frame_number
+            if self.policy == ReplacementPolicy.LRU:
+                self._cache.move_to_end(page_number)
+            return
+
+        if len(self._cache) >= self.size:
+            self._evict()
+
+        self._cache[page_number] = frame_number
+        if self.policy == ReplacementPolicy.FIFO:
+            self._order.append(page_number)
+
+    def _evict(self) -> None:
+        if self.policy == ReplacementPolicy.FIFO:
+            victim = self._order.popleft()
+            del self._cache[victim]
+        else:
+            self._cache.popitem(last=False)
+
+    def snapshot(self) -> dict[int, int]:
+        return dict(self._cache)
+
+    def reset(self) -> None:
+        self._cache.clear()
+        if self.policy == ReplacementPolicy.FIFO:
+            self._order.clear()
+
+    def __repr__(self) -> str:
+        entries = ", ".join(f"{p}->{f}" for p, f in self._cache.items())
+        return f"TLB[{self.policy.value}]({entries})"
