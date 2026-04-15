@@ -1,0 +1,11 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.env
+.venv/
+*.png
+tlb_analyzer_final.py
+build_commits.ps1
