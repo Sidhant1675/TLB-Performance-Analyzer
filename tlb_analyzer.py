@@ -125,3 +125,80 @@ class TLB:
     def __repr__(self) -> str:
         entries = ", ".join(f"{p}->{f}" for p, f in self._cache.items())
         return f"TLB[{self.policy.value}]({entries})"
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  Simulator
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+@dataclass
+class SimulationConfig:
+    num_pages: int = 10
+    page_size: int = 10
+    tlb_size: int = 3
+    policy: ReplacementPolicy = ReplacementPolicy.FIFO
+    addresses: list[int] = field(default_factory=list)
+
+
+class Simulator:
+    """Drives the full TLB simulation and collects metrics."""
+
+    def __init__(self, config: SimulationConfig):
+        self.config = config
+        self.page_table = PageTable(config.num_pages)
+        self.tlb = TLB(config.tlb_size, config.policy)
+        self.results: list[AccessResult] = []
+        self.hits = 0
+        self.misses = 0
+
+    @property
+    def total(self) -> int:
+        return self.hits + self.misses
+
+    @property
+    def hit_rate(self) -> float:
+        return self.hits / self.total if self.total else 0.0
+
+    @property
+    def miss_rate(self) -> float:
+        return self.misses / self.total if self.total else 0.0
+
+    @property
+    def emat(self) -> float:
+        hr = self.hit_rate
+        mr = self.miss_rate
+        return (hr * TLB_ACCESS_TIME) + (mr * (TLB_ACCESS_TIME + MEMORY_ACCESS_TIME))
+
+    def run(self) -> list[AccessResult]:
+        self.results.clear()
+        self.hits = 0
+        self.misses = 0
+        self.tlb.reset()
+
+        for addr in self.config.addresses:
+            page_num = addr // self.config.page_size
+            offset = addr % self.config.page_size
+
+            frame = self.tlb.lookup(page_num)
+            if frame is not None:
+                hit = True
+                self.hits += 1
+            else:
+                hit = False
+                self.misses += 1
+                frame = self.page_table.lookup(page_num)
+                if frame is None:
+                    frame = -1
+                else:
+                    self.tlb.insert(page_num, frame)
+
+            self.results.append(AccessResult(
+                virtual_address=addr,
+                page_number=page_num,
+                offset=offset,
+                frame_number=frame,
+                hit=hit,
+                tlb_snapshot=self.tlb.snapshot(),
+            ))
+
+        return self.results
