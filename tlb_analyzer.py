@@ -356,3 +356,41 @@ def plot_tlb_size_vs_hit_rate(config: SimulationConfig) -> None:
     fig.tight_layout()
     fig.savefig("tlb_size_vs_hit_rate.png", dpi=150)
     print("  [graph]  Saved:  tlb_size_vs_hit_rate.png")
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  Interactive CLI
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+def cli_get_config() -> SimulationConfig:
+    print(f"{BOLD}Select mode:{RESET}")
+    print(f"  {CYAN}1{RESET}) Manual input")
+    print(f"  {CYAN}2{RESET}) Auto-generated random addresses")
+    print(f"  {CYAN}3{RESET}) Run built-in example test case")
+    choice = input(f"\n  Enter choice [{CYAN}1-3{RESET}]: ").strip()
+
+    if choice == "3":
+        return SimulationConfig(
+            num_pages=10,
+            page_size=10,
+            tlb_size=3,
+            policy=ReplacementPolicy.FIFO,
+            addresses=[10, 22, 15, 10, 45, 22],
+        )
+
+    num_pages = int(input("  Number of pages  [10]: ").strip() or 10)
+    page_size = int(input("  Page size        [10]: ").strip() or 10)
+    tlb_size = int(input("  TLB size          [3]: ").strip() or 3)
+
+    pol_in = input("  Policy (FIFO/LRU) [FIFO]: ").strip().upper() or "FIFO"
+    policy = ReplacementPolicy[pol_in]
+
+    if choice == "1":
+        raw = input("  Enter addresses (comma-separated): ").strip()
+        addresses = [int(a.strip()) for a in raw.split(",")]
+    else:
+        count = int(input("  Number of accesses [20]: ").strip() or 20)
+        max_addr = num_pages * page_size - 1
+        addresses = [random.randint(0, max_addr) for _ in range(count)]
+
+    return SimulationConfig(num_pages, page_size, tlb_size, policy, addresses)
