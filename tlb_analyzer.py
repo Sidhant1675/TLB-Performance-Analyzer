@@ -394,3 +394,40 @@ def cli_get_config() -> SimulationConfig:
         addresses = [random.randint(0, max_addr) for _ in range(count)]
 
     return SimulationConfig(num_pages, page_size, tlb_size, policy, addresses)
+
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#  Main
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+def main() -> None:
+    print_banner()
+    config = cli_get_config()
+
+    print()
+    print_config(config)
+
+    sim = Simulator(config)
+    results = sim.run()
+
+    print(f"{BOLD}Step-by-Step Trace{RESET}")
+    print(DIVIDER)
+    for i, r in enumerate(results):
+        print_step(i, r)
+    print(DIVIDER)
+
+    print_summary(sim)
+
+    print(f"{BOLD}Generating graphs ...{RESET}")
+    try:
+        plot_cumulative_hit_rate(results)
+        plot_tlb_size_vs_hit_rate(config)
+        print(f"\n  {DIM}Open the PNG files to view graphs.{RESET}")
+    except Exception as exc:
+        print(f"  Could not render plots: {exc}")
+
+    print(f"\n{DIM}Done.{RESET}\n")
+
+
+if __name__ == "__main__":
+    main()
